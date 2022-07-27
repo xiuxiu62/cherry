@@ -1,9 +1,15 @@
+use crate::editor::Span;
+
 #[repr(transparent)]
 pub struct TextBuffer(pub Vec<String>);
 
 impl TextBuffer {
     pub fn new(inner: Vec<String>) -> Self {
         Self(inner)
+    }
+
+    pub fn insert(&mut self, i: usize, line: String) {
+        self.0.insert(i, line);
     }
 
     pub fn append(&mut self, i: usize, data: &str) {
@@ -13,12 +19,15 @@ impl TextBuffer {
         }
     }
 
-    pub fn insert(&mut self, i: usize, line: String) {
-        self.0.insert(i, line);
+    pub fn line_len(&self, i: usize) -> usize {
+        match self.0.get(i) {
+            Some(line) => line.len(),
+            None => 0,
+        }
     }
 
-    pub fn display_range(&self, start: usize, end: usize) -> String {
-        (start..end)
+    pub fn display_range(&self, span: &Span) -> String {
+        (span.start..span.end)
             .map(|i| match self.0.get(i) {
                 Some(line) => line,
                 None => "\n",

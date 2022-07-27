@@ -4,38 +4,44 @@ use crate::{
     text_buffer::TextBuffer,
     Config, CHAR_MAP,
 };
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent};
-use std::{mem, ops::Range};
+use crossterm::event::{
+    self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 
 pub enum Message {
     Continue,
     Stop,
 }
 
-type Span<T> = std::ops::Range<T>;
-type Spanned<T> = (T, Span<usize>);
+pub type Span = std::ops::Range<usize>;
+pub type Spanned<T> = (T, Span);
 
 pub struct Editor {
     terminal: Terminal,
     position: (u16, u16),
     buffer: TextBuffer,
-    top_line: usize,
+    span: Span,
 }
 
 impl Editor {
     #[inline]
     pub fn new(terminal: Terminal, buffer: TextBuffer) -> Self {
+        let span = Span {
+            start: 0,
+            end: terminal.size.1 as usize,
+        };
+
         Self {
             terminal,
             buffer,
             position: (0, 0),
-            top_line: 0,
+            span,
         }
     }
 
     #[inline]
-    pub fn initialize(&mut self, config: &Config) -> Result<()> {
-        self.terminal.initialize(&config)
+    pub fn initialize(&mut self) -> Result<()> {
+        self.terminal.initialize()
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -70,33 +76,52 @@ impl Editor {
             (KeyCode::Right, KeyModifiers::NONE) => self.move_right()?,
             (KeyCode::Up, KeyModifiers::NONE) => self.move_up()?,
             (KeyCode::Down, KeyModifiers::NONE) => self.move_down()?,
-
             (KeyCode::Backspace, KeyModifiers::NONE) => self.delete_last()?,
-            (KeyCode::Null, KeyModifiers::NONE) => self.terminal.write("")?,
-            (code, KeyModifiers::NONE) => {
-                if let Some(value) = CHAR_MAP.get(&code) {
-                    self.terminal.write(*value)?;
+            (code, KeyModifiers::NONE) => match code {
+                KeyCode::Enter => {
+                    self.terminal.write("\r\n")?;
+                    self.position.0 = 0;
+                    self.position.1 += 1;
                 }
-            }
+                KeyCode::Tab => {
+                    self.terminal.write(CHAR_MAP.get(&code).unwrap())?;
+
+                    let dx = self.position.0 + 4;
+                    if dx > self.terminal.size.0 {
+                        self.position.0 = dx - self.terminal.size.0;
+                        self.position.1 += 1;
+                    }
+                }
+                code => {
+                    if let Some(value) = CHAR_MAP.get(&code) {
+                        self.terminal.write(*value)?;
+                    }
+                }
+            },
             _ => {}
         };
 
         Ok(Message::Continue)
     }
 
-    fn handle_mouse_event(&mut self, _event: MouseEvent) -> Result<Message> {
+    fn handle_mouse_event(&mut self, event: MouseEvent) -> Result<Message> {
+        if let MouseEventKind::Down(MouseButton::Left) = event.kind {
+            self.move_to(event.column, event.row)?;
+        };
+
         Ok(Message::Continue)
     }
 
     fn handle_resize_event(&mut self, width: u16, height: u16) -> Result<Message> {
+        let dy = height as i16 - self.terminal.size.1 as i16;
+        self.span.end += dy as usize;
         self.terminal.size = (width, height);
 
         Ok(Message::Continue)
     }
 
     fn buffer_write(&mut self) -> Result<()> {
-        let (start, end) = self.view_range();
-        let contents = self.buffer.display_range(start, end);
+        let contents = self.buffer.display_range(&self.span);
         self.terminal.write(contents)?;
 
         Ok(())
@@ -105,13 +130,16 @@ impl Editor {
     // TODO: Fix write overs on scroll
     fn buffer_rows(&mut self) -> Result<()> {
         let (rows, _columns) = self.terminal.size()?;
-        (0..rows).for_each(|i| self.buffer.append(i as usize, "~\n"));
+        (0..rows).for_each(|i| self.buffer.append(i as usize, "~\r\n"));
 
         Ok(())
     }
 
-    fn view_range(&self) -> (usize, usize) {
-        (self.top_line, self.terminal.size.1 as usize)
+    fn move_to(&mut self, column: u16, row: u16) -> Result<()> {
+        self.position.0 = column;
+        self.position.1 = row;
+
+        self.terminal.cursor_move_to(column, row)
     }
 
     fn move_left(&mut self) -> Result<()> {
