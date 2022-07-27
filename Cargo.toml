@@ -1,0 +1,9 @@
+[package]
+name = "text-editor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.24.0"
+lazy_static = "1.4.0"
+thiserror = "1.0.31"
