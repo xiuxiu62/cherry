@@ -60,9 +60,8 @@ impl Terminal {
         self.execute(style::Print(data))
     }
 
-    pub fn delete_last(&mut self) -> Result<()> {
-        self.cursor_move(Direction::Left, 1)?;
-        self.write(" ")?;
+    pub fn delete_current(&mut self) -> Result<()> {
+        self.write(' ')?;
 
         self.cursor_move(Direction::Left, 1)
     }
@@ -70,6 +69,11 @@ impl Terminal {
     #[inline]
     pub fn cursor_move(&mut self, direction: Direction, n: u16) -> Result<()> {
         Cursor::move_(self, direction, n)
+    }
+
+    #[inline]
+    pub fn cursor_move_to(&mut self, column: u16, row: u16) -> Result<()> {
+        Cursor::move_to(self, column, row)
     }
 
     #[inline]
@@ -142,5 +146,10 @@ impl Cursor {
             Direction::Up => terminal.execute(cursor::MoveUp(n)),
             Direction::Down => terminal.execute(cursor::MoveDown(n)),
         }
+    }
+
+    #[inline]
+    pub fn move_to(terminal: &mut Terminal, column: u16, row: u16) -> Result<()> {
+        terminal.execute(cursor::MoveTo(column, row))
     }
 }
