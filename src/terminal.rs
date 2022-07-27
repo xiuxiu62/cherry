@@ -12,12 +12,18 @@ pub enum Direction {
     Down,
 }
 
-pub struct Terminal(Stdout);
+pub struct Terminal {
+    stdout: Stdout,
+    pub size: (u16, u16),
+}
 
 impl Terminal {
     #[inline]
-    pub fn new() -> Self {
-        Self(io::stdout())
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            stdout: io::stdout(),
+            size: terminal::size()?,
+        })
     }
 
     pub fn initialize(&mut self, config: &Config) -> Result<()> {
@@ -63,12 +69,7 @@ impl Terminal {
 
     #[inline]
     pub fn cursor_move(&mut self, direction: Direction, n: u16) -> Result<()> {
-        match direction {
-            Direction::Left => Cursor::left(self, n),
-            Direction::Right => Cursor::right(self, n),
-            Direction::Up => Cursor::up(self, n),
-            Direction::Down => Cursor::down(self, n),
-        }
+        Cursor::move_(self, direction, n)
     }
 
     #[inline]
@@ -97,7 +98,7 @@ impl Terminal {
 
     #[inline]
     fn execute(&mut self, command: impl Command) -> Result<()> {
-        self.0.execute(command)?;
+        self.stdout.execute(command)?;
 
         Ok(())
     }
@@ -134,22 +135,12 @@ impl Cursor {
     }
 
     #[inline]
-    pub fn left(terminal: &mut Terminal, n: u16) -> Result<()> {
-        terminal.execute(cursor::MoveLeft(n))
-    }
-
-    #[inline]
-    pub fn right(terminal: &mut Terminal, n: u16) -> Result<()> {
-        terminal.execute(cursor::MoveRight(n))
-    }
-
-    #[inline]
-    pub fn up(terminal: &mut Terminal, n: u16) -> Result<()> {
-        terminal.execute(cursor::MoveUp(n))
-    }
-
-    #[inline]
-    pub fn down(terminal: &mut Terminal, n: u16) -> Result<()> {
-        terminal.execute(cursor::MoveDown(n))
+    pub fn move_(terminal: &mut Terminal, direction: Direction, n: u16) -> Result<()> {
+        match direction {
+            Direction::Left => terminal.execute(cursor::MoveLeft(n)),
+            Direction::Right => terminal.execute(cursor::MoveRight(n)),
+            Direction::Up => terminal.execute(cursor::MoveUp(n)),
+            Direction::Down => terminal.execute(cursor::MoveDown(n)),
+        }
     }
 }

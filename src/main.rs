@@ -12,7 +12,7 @@ use terminal::Terminal;
 
 fn main() -> Result<()> {
     let config = Config::new(None, None, None, true, true);
-    let terminal = Terminal::new();
+    let terminal = Terminal::new()?;
     let mut editor = Editor::new(terminal);
 
     editor.initialize(&config)?;

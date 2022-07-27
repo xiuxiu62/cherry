@@ -3,7 +3,7 @@ use crate::{
     terminal::{Direction, Terminal},
     Config, CHAR_MAP,
 };
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 use std::mem;
 
 pub enum Message {
@@ -39,8 +39,6 @@ impl Editor {
         self.terminal.cursor_reset()?;
 
         loop {
-            // self.position = cursor::position()?;
-
             let event = event::read()?;
             if let Message::Stop = self.handle_event(&event)? {
                 break;
@@ -53,6 +51,8 @@ impl Editor {
     pub fn handle_event(&mut self, event: &Event) -> Result<Message> {
         match *event {
             Event::Key(event) => self.handle_key_event(event),
+            Event::Mouse(event) => self.handle_mouse_event(event),
+            Event::Resize(width, height) => self.handle_resize_event(width, height),
             _ => Ok(Message::Continue),
         }
     }
@@ -74,6 +74,16 @@ impl Editor {
             }
             _ => {}
         };
+
+        Ok(Message::Continue)
+    }
+
+    fn handle_mouse_event(&mut self, event: MouseEvent) -> Result<Message> {
+        todo!()
+    }
+
+    fn handle_resize_event(&mut self, width: u16, height: u16) -> Result<Message> {
+        self.terminal.size = (width, height);
 
         Ok(Message::Continue)
     }
