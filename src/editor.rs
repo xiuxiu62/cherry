@@ -2,23 +2,29 @@ use crate::{
     error::Result,
     terminal::{Direction, Terminal},
     text_buffer::TextBuffer,
-    Config, CHAR_MAP,
+    CHAR_MAP,
 };
 use crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
+
+pub type Span = std::ops::Range<usize>;
+pub type Spanned<T> = (T, Span);
 
 pub enum Message {
     Continue,
     Stop,
 }
 
-pub type Span = std::ops::Range<usize>;
-pub type Spanned<T> = (T, Span);
-
+pub enum Mode {
+    Normal,
+    Insert,
+    Visual,
+}
 pub struct Editor {
     terminal: Terminal,
     position: (u16, u16),
+    mode: Mode,
     buffer: TextBuffer,
     span: Span,
 }
@@ -34,6 +40,7 @@ impl Editor {
         Self {
             terminal,
             buffer,
+            mode: Mode::Normal,
             position: (0, 0),
             span,
         }
@@ -77,7 +84,7 @@ impl Editor {
             (KeyCode::Up, KeyModifiers::NONE) => self.move_up()?,
             (KeyCode::Down, KeyModifiers::NONE) => self.move_down()?,
             (KeyCode::Backspace, KeyModifiers::NONE) => self.delete_last()?,
-            (code, KeyModifiers::NONE) => match code {
+            (code, KeyModifiers::NONE) | (code, KeyModifiers::SHIFT) => match code {
                 KeyCode::Enter => {
                     self.terminal.write("\r\n")?;
                     self.position.0 = 0;

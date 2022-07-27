@@ -14,9 +14,6 @@ macro_rules! hashmap {
 
 lazy_static! {
     pub static ref CHAR_MAP: HashMap<KeyCode, char> = hashmap!(<KeyCode, char> [
-       KeyCode::Enter => '\n',
-       KeyCode::Tab => '\t',
-       KeyCode::Char(' ') => ' ',
        KeyCode::Char('a') => 'a',
        KeyCode::Char('b') => 'b',
        KeyCode::Char('c') => 'c',
@@ -43,6 +40,34 @@ lazy_static! {
        KeyCode::Char('x') => 'x',
        KeyCode::Char('y') => 'y',
        KeyCode::Char('z') => 'z',
+
+       KeyCode::Char('A') => 'A',
+       KeyCode::Char('B') => 'B',
+       KeyCode::Char('C') => 'C',
+       KeyCode::Char('D') => 'D',
+       KeyCode::Char('E') => 'E',
+       KeyCode::Char('F') => 'F',
+       KeyCode::Char('G') => 'G',
+       KeyCode::Char('H') => 'H',
+       KeyCode::Char('I') => 'I',
+       KeyCode::Char('J') => 'J',
+       KeyCode::Char('K') => 'K',
+       KeyCode::Char('L') => 'L',
+       KeyCode::Char('M') => 'M',
+       KeyCode::Char('N') => 'N',
+       KeyCode::Char('O') => 'O',
+       KeyCode::Char('P') => 'P',
+       KeyCode::Char('Q') => 'Q',
+       KeyCode::Char('R') => 'R',
+       KeyCode::Char('S') => 'S',
+       KeyCode::Char('T') => 'T',
+       KeyCode::Char('U') => 'U',
+       KeyCode::Char('V') => 'V',
+       KeyCode::Char('W') => 'W',
+       KeyCode::Char('X') => 'X',
+       KeyCode::Char('Y') => 'Y',
+       KeyCode::Char('Z') => 'Z',
+
        KeyCode::Char('1') => '1',
        KeyCode::Char('2') => '2',
        KeyCode::Char('3') => '3',
@@ -53,6 +78,23 @@ lazy_static! {
        KeyCode::Char('8') => '8',
        KeyCode::Char('9') => '9',
        KeyCode::Char('0') => '0',
+       KeyCode::Char('=') => '=',
+       KeyCode::Char('+') => '+',
+       KeyCode::Char('-') => '-',
+       KeyCode::Char('_') => '_',
+
+       KeyCode::Char('!') => '!',
+       KeyCode::Char('@') => '@',
+       KeyCode::Char('#') => '#',
+       KeyCode::Char('$') => '$',
+       KeyCode::Char('%') => '%',
+       KeyCode::Char('^') => '^',
+       KeyCode::Char('&') => '&',
+       KeyCode::Char('*') => '*',
+       KeyCode::Char('(') => '(',
+       KeyCode::Char(')') => ')',
+
+
        KeyCode::Char('[') => '[',
        KeyCode::Char('{') => '{',
        KeyCode::Char(']') => ']',
@@ -62,6 +104,15 @@ lazy_static! {
        KeyCode::Char('.') => '.',
        KeyCode::Char('>') => '>',
        KeyCode::Char('/') => '/',
-       KeyCode::Char('?') => '?'
+       KeyCode::Char('?') => '?',
+       KeyCode::Char(';') => ';',
+       KeyCode::Char(':') => ':',
+       KeyCode::Char('\'') => '\'',
+       KeyCode::Char('"') => '"',
+       KeyCode::Char('`') => '`',
+       KeyCode::Char('~') => '~',
+
+       KeyCode::Char(' ') => ' ',
+       KeyCode::Tab => '\t'
     ]);
 }

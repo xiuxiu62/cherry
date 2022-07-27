@@ -46,15 +46,15 @@ impl Terminal {
             self.execute(event::EnableMouseCapture)?;
         }
 
-        if let Some(color) = self.config.foreground_color {
+        if let Some(color) = self.config.theme.foreground_color {
             self.execute(style::SetForegroundColor(color.into()))?;
         }
 
-        if let Some(color) = self.config.background_color {
+        if let Some(color) = self.config.theme.background_color {
             self.execute(style::SetBackgroundColor(color.into()))?;
         }
 
-        if let Some(color) = self.config.underline_color {
+        if let Some(color) = self.config.theme.underline_color {
             self.execute(style::SetUnderlineColor(color.into()))?;
         }
 
@@ -63,10 +63,7 @@ impl Terminal {
 
     #[inline]
     pub fn write<T: Display>(&mut self, data: T) -> Result<()> {
-        Cursor::hide(self)?;
-        self.execute(style::Print(data))?;
-
-        Cursor::show(self)
+        self.execute(style::Print(data))
     }
 
     pub fn delete_current(&mut self) -> Result<()> {
