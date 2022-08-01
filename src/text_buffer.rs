@@ -1,6 +1,8 @@
-use std::fmt::Display;
-
-use crate::Span;
+use crate::{
+    error::{Error, Result},
+    Span,
+};
+use std::{fmt::Display, fs, path::PathBuf};
 
 // A text buffer with integrated range protections
 // NOTE: it might be better to have an unsafe TextBuffer
@@ -183,5 +185,35 @@ impl Display for TextBuffer {
             .collect();
 
         write!(f, "{message}")
+    }
+}
+
+impl From<&str> for TextBuffer {
+    fn from(data: &str) -> Self {
+        let inner: Vec<Option<String>> = data
+            .split("\r\n")
+            .map(|line| match line.len() {
+                0 => None,
+                _ => Some(line.to_owned()),
+            })
+            .collect();
+
+        Self::new(inner)
+    }
+}
+
+impl From<String> for TextBuffer {
+    fn from(data: String) -> Self {
+        Self::from(data.as_str())
+    }
+}
+
+impl TryFrom<PathBuf> for TextBuffer {
+    type Error = Error;
+
+    fn try_from(path: PathBuf) -> Result<Self> {
+        let data = fs::read_to_string(path)?;
+
+        Ok(Self::from(data))
     }
 }

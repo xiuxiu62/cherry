@@ -1,10 +1,13 @@
-use crate::{text_buffer::TextBuffer, Span};
-use std::fmt::{Debug, Display};
+use crate::{error::Result, text_buffer::TextBuffer, Span};
+use std::{
+    fmt::{Debug, Display},
+    path::PathBuf,
+};
 
 pub struct FrameBuffer {
-    pub text_buffer: TextBuffer,
+    text_buffer: TextBuffer,
     pub position: (usize, usize),
-    viewable_rows: Span,
+    pub viewable_rows: Span,
 }
 
 impl FrameBuffer {
@@ -14,6 +17,12 @@ impl FrameBuffer {
             position: (0, 0),
             viewable_rows,
         }
+    }
+
+    pub fn try_from_path(path: PathBuf, viewable_rows: Span) -> Result<Self> {
+        let text_buffer = TextBuffer::try_from(path)?;
+
+        Ok(Self::new(text_buffer, viewable_rows))
     }
 
     pub fn insert(&mut self, row: usize, data: &str) {
@@ -92,4 +101,16 @@ fn works() {
 
     println!("{}\n", buffer.format_viewable());
     println!("{buffer}");
+}
+
+#[test]
+fn from_path() -> Result<()> {
+    let mut buffer =
+        FrameBuffer::try_from_path(PathBuf::from("config.ron"), Span { start: 0, end: 5 })?;
+    buffer.append("hello world");
+
+    println!("{}\n", buffer.format_viewable());
+    println!("{buffer}");
+
+    Ok(())
 }
