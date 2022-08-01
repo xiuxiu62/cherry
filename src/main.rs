@@ -1,32 +1,71 @@
 mod config;
-mod editor;
+// mod editor;
 mod error;
+mod frame_buffer;
 mod keymap;
 mod terminal;
 mod text_buffer;
 
-use std::rc::Rc;
-
 pub use config::Config;
-use editor::Editor;
+use crossterm::event;
+// use editor::{Editor, Span};
 use error::{Error, Result, SerdeError};
+use frame_buffer::FrameBuffer;
 pub use keymap::CHAR_MAP;
 use terminal::Terminal;
 use text_buffer::TextBuffer;
 
+pub type Span = std::ops::Range<usize>;
+pub type Spanned<T> = (T, Span);
+
 const DEFAULT_CONFIG: &'static str = "config.ron";
 
 fn main() -> Result<()> {
-    let config = Rc::new(load_config(DEFAULT_CONFIG)?);
-    let terminal = Terminal::new(config)?;
-    let buffer = TextBuffer::default();
-    let mut editor = Editor::new(terminal, buffer);
+    let config = load_config(DEFAULT_CONFIG)?;
+    let mut terminal = Terminal::new()?;
+    terminal.initialize(&config)?;
 
-    editor.initialize()?;
-    editor.run()?;
+    terminal.cursor_reset()?;
+    terminal.write("hello world")?;
+
+    loop {
+        let event = event::read()?;
+        if let crossterm::event::Event::Key(crossterm::event::KeyEvent {
+            // crossterm::event::KeyCode::Char('c'),
+            // crossterm::event::KeyMod
+            code,
+            modifiers,
+        }) = event
+        {
+            if modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+                && code == crossterm::event::KeyCode::Char('c')
+            {
+                break;
+            }
+        }
+    }
 
     Ok(())
 }
+
+// fn main_bak() -> Result<()> {
+//     let config = load_config(DEFAULT_CONFIG)?;
+//     let terminal = Terminal::new()?;
+
+//     let size = terminal.size()?;
+//     let span = Span {
+//         start: 0,
+//         end: size.1 as usize,
+//     };
+//     let text_buffer = TextBuffer::new(vec![]);
+//     let frame_buffer = FrameBuffer::new(text_buffer, span);
+//     let mut editor = Editor::new(terminal, frame_buffer);
+
+//     editor.initialize()?;
+//     editor.run()?;
+
+//     Ok(())
+// }
 
 fn load_config(path: &str) -> Result<Config> {
     let contents = std::fs::read_to_string(path)?;
@@ -36,30 +75,3 @@ fn load_config(path: &str) -> Result<Config> {
         Err(err) => Err(Error::Serde(SerdeError::Deserialize(err.to_string()))),
     }
 }
-
-// fn main() {
-//     let theme = config::ThemeConfig::new(
-//         Some(config::ColorConfig::Red),
-//         Some(config::ColorConfig::Rgb {
-//             r: 0xcc,
-//             g: 0x44,
-//             b: 0xff,
-//         }),
-//         Some(config::ColorConfig::AnsiValue(0xff)),
-//     );
-
-//     let config = Config::new(theme, false, false, true);
-//     // let data = toml::ser::to_string_pretty(&config).unwrap();
-//     let pretty = ron::ser::PrettyConfig::new()
-//         .separate_tuple_members(true)
-//         .enumerate_arrays(true);
-
-//     let s = ron::ser::to_string(&config).unwrap();
-//     println!("config:\n{s}\n");
-
-//     let pretty_s = ron::ser::to_string_pretty(&config, pretty).unwrap();
-//     println!("pretty config:\n{pretty_s}\n");
-//     // let data = ron::ser::to_string_pretty(&config);
-
-//     // println!("{data}");
-// }

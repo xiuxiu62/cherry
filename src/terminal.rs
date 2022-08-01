@@ -1,60 +1,78 @@
 use crate::{error::Result, Config};
-use crossterm::{cursor, event, style, terminal, Command, ExecutableCommand};
+use crossterm::{
+    cursor, event, style,
+    terminal::{self, ClearType},
+    Command, ExecutableCommand,
+};
 use std::{
     fmt::Display,
     io::{self, Stdout},
     rc::Rc,
 };
 
-pub enum Direction {
-    Left,
-    Right,
-    Up,
-    Down,
+pub enum Move {
+    Left(u16),
+    Right(u16),
+    Up(u16),
+    Down(u16),
+    NextLine(u16),
+    PreviousLine(u16),
+    To(u16, u16),
 }
 
 pub struct Terminal {
     stdout: Stdout,
+    // config: Rc<Config>,
     pub size: (u16, u16),
-    config: Rc<Config>,
+    alternate_screen: bool,
 }
 
 impl Terminal {
     #[inline]
-    pub fn new(config: Rc<Config>) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         Ok(Self {
             stdout: io::stdout(),
             size: terminal::size()?,
-            config,
+            alternate_screen: false,
         })
     }
 
-    pub fn initialize(&mut self) -> Result<()> {
+    pub fn initialize(&mut self, config: &Config) -> Result<()> {
         self.enable_raw_mode()?;
+        self.initialize_terminal(config)?;
 
-        self.execute(event::EnableMouseCapture)?;
+        self.initialize_theme(config)
+    }
 
-        if self.config.alternate_screen {
+    fn initialize_terminal(&mut self, config: &Config) -> Result<()> {
+        if config.alternate_screen {
+            self.alternate_screen = true;
             self.execute(terminal::EnterAlternateScreen)?;
+        } else {
+            self.execute(terminal::Clear(ClearType::All))?;
         }
 
-        if self.config.line_wrapping {
+        if config.line_wrapping {
             self.execute(terminal::EnableLineWrap)?;
         }
 
-        if self.config.mouse_capture {
+        if config.mouse_capture {
             self.execute(event::EnableMouseCapture)?;
         }
 
-        if let Some(color) = self.config.theme.foreground_color {
+        Ok(())
+    }
+
+    fn initialize_theme(&mut self, config: &Config) -> Result<()> {
+        if let Some(color) = config.theme.foreground_color {
             self.execute(style::SetForegroundColor(color.into()))?;
         }
 
-        if let Some(color) = self.config.theme.background_color {
+        if let Some(color) = config.theme.background_color {
             self.execute(style::SetBackgroundColor(color.into()))?;
         }
 
-        if let Some(color) = self.config.theme.underline_color {
+        if let Some(color) = config.theme.underline_color {
             self.execute(style::SetUnderlineColor(color.into()))?;
         }
 
@@ -69,12 +87,12 @@ impl Terminal {
     pub fn delete_current(&mut self) -> Result<()> {
         self.write(' ')?;
 
-        self.cursor_move(Direction::Left, 1)
+        self.cursor_move(Move::Left(1))
     }
 
     #[inline]
-    pub fn cursor_move(&mut self, direction: Direction, n: u16) -> Result<()> {
-        Cursor::move_(self, direction, n)
+    pub fn cursor_move(&mut self, move_: Move) -> Result<()> {
+        Cursor::move_(self, move_)
     }
 
     #[inline]
@@ -116,7 +134,7 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        if self.config.alternate_screen {
+        if self.alternate_screen {
             if let Err(err) = self.execute(terminal::LeaveAlternateScreen) {
                 eprintln!("failed to leave alternate screen: {err}")
             };
@@ -147,12 +165,15 @@ impl Cursor {
     }
 
     #[inline]
-    pub fn move_(terminal: &mut Terminal, direction: Direction, n: u16) -> Result<()> {
-        match direction {
-            Direction::Left => terminal.execute(cursor::MoveLeft(n)),
-            Direction::Right => terminal.execute(cursor::MoveRight(n)),
-            Direction::Up => terminal.execute(cursor::MoveUp(n)),
-            Direction::Down => terminal.execute(cursor::MoveDown(n)),
+    pub fn move_(terminal: &mut Terminal, move_: Move) -> Result<()> {
+        match move_ {
+            Move::Left(n) => terminal.execute(cursor::MoveLeft(n)),
+            Move::Right(n) => terminal.execute(cursor::MoveRight(n)),
+            Move::Up(n) => terminal.execute(cursor::MoveUp(n)),
+            Move::Down(n) => terminal.execute(cursor::MoveDown(n)),
+            Move::NextLine(n) => terminal.execute(cursor::MoveToNextLine(n)),
+            Move::PreviousLine(n) => terminal.execute(cursor::MoveToPreviousLine(n)),
+            Move::To(column, row) => terminal.execute(cursor::MoveTo(column, row)),
         }
     }
 

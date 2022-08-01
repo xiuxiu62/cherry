@@ -1,15 +1,13 @@
 use crate::{
     error::Result,
-    terminal::{Direction, Terminal},
-    text_buffer::TextBuffer,
-    CHAR_MAP,
+    frame_buffer::FrameBuffer,
+    terminal::{Move, Terminal},
+    Config, CHAR_MAP,
 };
 use crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
-
-pub type Span = std::ops::Range<usize>;
-pub type Spanned<T> = (T, Span);
+use std::fmt::Display;
 
 pub enum Message {
     Continue,
@@ -21,17 +19,19 @@ pub enum Mode {
     Insert,
     Visual,
 }
+
 pub struct Editor {
     terminal: Terminal,
-    position: (u16, u16),
+    buffer: FrameBuffer,
     mode: Mode,
-    buffer: TextBuffer,
+    position: (u16, u16),
+    line_position: usize,
     span: Span,
 }
 
 impl Editor {
     #[inline]
-    pub fn new(terminal: Terminal, buffer: TextBuffer) -> Self {
+    pub fn new(terminal: Terminal, buffer: FrameBuffer) -> Self {
         let span = Span {
             start: 0,
             end: terminal.size.1 as usize,
@@ -42,18 +42,19 @@ impl Editor {
             buffer,
             mode: Mode::Normal,
             position: (0, 0),
+            line_position: 0,
             span,
         }
     }
 
     #[inline]
-    pub fn initialize(&mut self) -> Result<()> {
-        self.terminal.initialize()
+    pub fn initialize(&mut self, config: &Config) -> Result<()> {
+        self.terminal.initialize(config)
     }
 
     pub fn run(&mut self) -> Result<()> {
-        self.buffer_rows()?;
-        self.buffer_write()?;
+        // self.buffer_rows()?;
+        // self.buffer_write()?;
 
         self.terminal.cursor_reset()?;
 
@@ -76,35 +77,33 @@ impl Editor {
     }
 
     fn handle_key_event(&mut self, event: KeyEvent) -> Result<Message> {
-        match (event.code, event.modifiers) {
+        let (code, modifiers) = (event.code, event.modifiers);
+        match (code, modifiers) {
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => return Ok(Message::Stop),
-
             (KeyCode::Left, KeyModifiers::NONE) => self.move_left()?,
             (KeyCode::Right, KeyModifiers::NONE) => self.move_right()?,
             (KeyCode::Up, KeyModifiers::NONE) => self.move_up()?,
             (KeyCode::Down, KeyModifiers::NONE) => self.move_down()?,
             (KeyCode::Backspace, KeyModifiers::NONE) => self.delete_last()?,
-            (code, KeyModifiers::NONE) | (code, KeyModifiers::SHIFT) => match code {
-                KeyCode::Enter => {
-                    self.terminal.write("\r\n")?;
-                    self.position.0 = 0;
+            (KeyCode::Enter, KeyModifiers::NONE) => {
+                self.terminal.write("\r\n")?;
+                self.position.0 = 0;
+                self.position.1 += 1;
+            }
+            (KeyCode::Tab, KeyModifiers::NONE) => {
+                self.terminal.write(CHAR_MAP.get(&code).unwrap())?;
+
+                let dx = self.position.0 + 4;
+                if dx > self.terminal.size.0 {
+                    self.position.0 = dx - self.terminal.size.0;
                     self.position.1 += 1;
                 }
-                KeyCode::Tab => {
-                    self.terminal.write(CHAR_MAP.get(&code).unwrap())?;
-
-                    let dx = self.position.0 + 4;
-                    if dx > self.terminal.size.0 {
-                        self.position.0 = dx - self.terminal.size.0;
-                        self.position.1 += 1;
-                    }
+            }
+            (code, KeyModifiers::NONE) | (code, KeyModifiers::SHIFT) => {
+                if let Some(value) = CHAR_MAP.get(&code) {
+                    self.terminal.write(*value)?;
                 }
-                code => {
-                    if let Some(value) = CHAR_MAP.get(&code) {
-                        self.terminal.write(*value)?;
-                    }
-                }
-            },
+            }
             _ => {}
         };
 
@@ -127,20 +126,33 @@ impl Editor {
         Ok(Message::Continue)
     }
 
-    fn buffer_write(&mut self) -> Result<()> {
-        let contents = self.buffer.display_range(&self.span);
-        self.terminal.write(contents)?;
+    // fn terminal_write_current<T: Display>(&mut self) -> Result<()> {
+    //     self.terminal.write(line)
+    // }
 
-        Ok(())
-    }
+    // fn buffer_write_current(&mut self, segment: &str) {
+    // let segment = data.to_string();
+
+    // self.buffer.append_to_current(segment);
+
+    // self.buffer.
+    // self.terminal.write(data)
+    // }
+
+    // fn buffer_write(&mut self) -> Result<()> {
+    //     let contents = format!("{}", self.buffer);
+    //     self.terminal.write(contents)?;
+
+    //     Ok(())
+    // }
 
     // TODO: Fix write overs on scroll
-    fn buffer_rows(&mut self) -> Result<()> {
-        let (rows, _columns) = self.terminal.size()?;
-        (0..rows).for_each(|i| self.buffer.append(i as usize, "~\r\n"));
+    // fn place_rows(&mut self) -> Result<()> {
+    //     let (rows, _columns) = self.terminal.size()?;
+    //     (0..rows).for_each(|i| self.terminal.write(i as usize, "~\r\n"));
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     fn move_to(&mut self, column: u16, row: u16) -> Result<()> {
         self.position.0 = column;
@@ -153,7 +165,7 @@ impl Editor {
         if self.position.0 > 0 {
             self.position.0 -= 1;
 
-            return self.terminal.cursor_move(Direction::Left, 1);
+            return self.terminal.cursor_move(Move::Left(1));
         }
 
         if self.position.1 > 0 {
@@ -180,14 +192,14 @@ impl Editor {
 
         self.position.0 += 1;
 
-        self.terminal.cursor_move(Direction::Right, 1)
+        self.terminal.cursor_move(Move::Right(1))
     }
 
     fn move_up(&mut self) -> Result<()> {
         if self.position.1 > 0 {
             self.position.1 -= 1;
 
-            return self.terminal.cursor_move(Direction::Up, 1);
+            return self.terminal.cursor_move(Move::Up(1));
         }
 
         Ok(())
@@ -196,12 +208,18 @@ impl Editor {
     fn move_down(&mut self) -> Result<()> {
         self.position.1 += 1;
 
-        self.terminal.cursor_move(Direction::Down, 1)
+        self.terminal.cursor_move(Move::Down(1))
     }
 
     fn delete_last(&mut self) -> Result<()> {
         self.move_left()?;
 
         self.terminal.delete_current()
+    }
+}
+
+impl Drop for Editor {
+    fn drop(&mut self) {
+        println!("{:#?}", self.buffer)
     }
 }

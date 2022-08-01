@@ -1,0 +1,209 @@
+use crate::Span;
+use std::fmt::Display;
+
+// #[derive(Debug)]
+// pub struct TextBuffer(pub Vec<String>);
+
+// impl TextBuffer {
+//     pub fn new(inner: Vec<String>) -> Self {
+//         Self(inner)
+//     }
+
+//     pub fn append(&mut self, i: usize, data: &str) {
+//         match self.0.get_mut(i) {
+//             Some(line) => line.push_str(data),
+//             None => self.insert(i, data),
+//         }
+//     }
+
+//     pub fn insert(&mut self, i: usize, data: &str) {
+//         self.0.insert(i, data.to_owned());
+//     }
+
+//     pub fn line_len(&self, i: usize) -> usize {
+//         match self.0.get(i) {
+//             Some(line) => line.len(),
+//             None => 0,
+//         }
+//     }
+
+//     pub fn format_range(&self, span: &Span) -> String {
+//         (span.start..span.end)
+//             .map(|i| match self.0.get(i) {
+//                 Some(line) => line,
+//                 None => "\n",
+//             })
+//             .fold("".to_owned(), |acc, line| format!("{acc}{line}"))
+//     }
+// }
+
+// impl Default for TextBuffer {
+//     fn default() -> Self {
+//         Self(vec![])
+//     }
+// }
+
+// impl Into<String> for TextBuffer {
+//     fn into(self) -> String {
+//         self.0.join("")
+//     }
+// }
+
+// impl Display for Word {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}", self.0)
+//     }
+// }
+
+#[derive(Debug)]
+pub struct TextBuffer(Vec<Option<Line>>);
+
+impl TextBuffer {
+    pub fn new(lines: Vec<Option<Line>>) -> Self {
+        Self(lines)
+    }
+
+    pub fn insert(&mut self, i: usize, line: Line) {
+        let len = self.0.len();
+        if i > len {
+            (len..i).for_each(|i| self.0.insert(i, None));
+        }
+
+        self.0.insert(i, Some(line));
+    }
+
+    pub fn append(&mut self, line: Line) {
+        self.0.push(Some(line));
+    }
+
+    pub fn remove(&mut self, i: usize) -> Option<Line> {
+        self.0.remove(i)
+    }
+
+    pub fn get_line(&self, i: usize) -> Option<&Option<Line>> {
+        self.0.get(i)
+    }
+
+    pub fn get_line_mut(&mut self, i: usize) -> Option<&mut Option<Line>> {
+        self.0.get_mut(i)
+    }
+}
+
+impl Default for TextBuffer {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
+impl Display for TextBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message: String = self
+            .0
+            .iter()
+            .map(|line| match line {
+                Some(line) => format!("{line}\r\n"),
+                None => "\r\n".to_owned(),
+            })
+            .collect();
+
+        write!(f, "{message}")
+    }
+}
+
+#[derive(Debug)]
+pub struct Line(Vec<String>);
+
+impl Line {
+    pub fn len(&self) -> usize {
+        self.0.iter().fold(0, |acc, word| acc + word.len())
+    }
+
+    pub fn word_count(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn insert(&mut self, i: usize, word: &str) {
+        self.0.insert(i, word.to_owned());
+    }
+
+    pub fn append(&mut self, word: &str) {
+        self.0.push(word.to_owned());
+    }
+
+    // TODO: build higher order functionallity for word editting safety,
+    // particularly regarding safe indexing and ranging.
+    pub fn word_insert(&mut self, line_index: usize, word_index: usize, character: char) {
+        self.0[line_index].insert(word_index, character);
+    }
+
+    pub fn word_insert_str(&mut self, line_index: usize, word_index: usize, segment: &str) {
+        self.0[line_index].insert_str(word_index, segment);
+    }
+
+    pub fn word_push(&mut self, line_index: usize, character: char) {
+        self.0[line_index].push(character);
+    }
+
+    pub fn word_push_str(&mut self, line_index: usize, segment: &str) {
+        self.0[line_index].push_str(segment);
+    }
+
+    pub fn word_pop(&mut self, line_index: usize) {
+        self.0[line_index].pop();
+    }
+
+    pub fn word_remove(&mut self, line_index: usize, word_index: usize) {
+        self.0[line_index].remove(word_index);
+    }
+
+    pub fn word_remove_range(&mut self, line_index: usize, word_span: Span) {
+        (word_span.start..word_span.end).for_each(|i| self.word_remove(line_index, i));
+    }
+}
+
+impl Display for Line {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = self
+            .0
+            .iter()
+            .fold("".to_owned(), |acc, word| format!("{acc}{word}"));
+
+        write!(f, "{}", message)
+    }
+}
+
+impl From<&str> for Line {
+    fn from(s: &str) -> Self {
+        let mut words: Vec<String> = s.split(' ').map(|word| format!("{word} ")).collect();
+        words.last_mut().unwrap().pop();
+
+        Self(words)
+    }
+}
+
+impl From<String> for Line {
+    fn from(s: String) -> Self {
+        Self::from(s.as_str())
+    }
+}
+
+#[test]
+fn initialize() {
+    let mut buffer = TextBuffer::default();
+
+    buffer.append(Line::from("hello world"));
+    buffer.append(Line::from("my name is"));
+    buffer.append(Line::from("cherry"));
+    buffer.insert(4, Line::from(":)"));
+
+    if let Some(line) = buffer.get_line_mut(0).unwrap() {
+        line.append("!");
+    };
+
+    let line = buffer.get_line(0).unwrap();
+
+    // assert!(line.word_count() == 2);
+    // assert!(line.len() == 11);
+
+    println!("{buffer}")
+}

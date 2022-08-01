@@ -4,7 +4,7 @@
         background_color: None,
         underline_color: None,
     ),
-    alternate_screen: false,
+    alternate_screen: true,
     line_wrapping: false,
     mouse_capture: true,
 )
