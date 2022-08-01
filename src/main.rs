@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod config;
 mod editor;
 mod error;
@@ -8,7 +10,6 @@ mod terminal;
 use std::path::PathBuf;
 
 pub use config::Config;
-use crossterm::event;
 use editor::Editor;
 use error::{Error, Result, SerdeError};
 use frame_buffer::FrameBuffer;
@@ -18,82 +19,42 @@ use terminal::Terminal;
 pub type Span = std::ops::Range<usize>;
 pub type Spanned<T> = (T, Span);
 
-const DEFAULT_CONFIG: &'static str = "config.ron";
-
-// fn main_bak() -> Result<()> {
-//     let config = load_config(DEFAULT_CONFIG)?;
-//     let mut terminal = Terminal::new()?;
-//     terminal.initialize(&config)?;
-
-//     terminal.cursor_reset()?;
-//     terminal.write("hello world")?;
-
-//     loop {
-//         let event = event::read()?;
-//         if let crossterm::event::Event::Key(crossterm::event::KeyEvent {
-//             // crossterm::event::KeyCode::Char('c'),
-//             // crossterm::event::KeyMod
-//             code,
-//             modifiers,
-//         }) = event
-//         {
-//             if modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
-//                 && code == crossterm::event::KeyCode::Char('c')
-//             {
-//                 break;
-//             }
-//         }
-//     }
-
-//     Ok(())
-// }
+const DEFAULT_CONFIG: &str = "config.ron";
 
 fn main() -> Result<()> {
-    let mut editor = initialize()?;
-    editor.run()?;
+    let mut app = App::new()?;
 
-    Ok(())
+    app.run()
 }
 
-fn initialize() -> Result<Editor> {
-    let config = load_config(DEFAULT_CONFIG)?;
-    let terminal = Terminal::new()?;
+struct App(Editor);
 
-    let view_span = Span {
-        start: 0,
-        end: terminal.size()?.1 as usize,
-    };
-    let buffer = FrameBuffer::try_from_path(PathBuf::from("config.ron"), view_span)?;
-    let mut editor = Editor::new(terminal, buffer);
-    editor.initialize(&config)?;
+impl App {
+    pub fn new() -> Result<Self> {
+        let config = Self::load_config(DEFAULT_CONFIG)?;
+        let terminal = Terminal::new()?;
 
-    Ok(editor)
-}
+        let view_span = Span {
+            start: 0,
+            end: terminal.size()?.1 as usize,
+        };
+        let buffer = FrameBuffer::try_from_path(PathBuf::from("config.ron"), view_span)?;
+        let mut editor = Editor::new(terminal, buffer, config);
+        editor.initialize()?;
 
-// fn main_bak() -> Result<()> {
-//     let config = load_config(DEFAULT_CONFIG)?;
-//     let terminal = Terminal::new()?;
+        Ok(Self(editor))
+    }
 
-//     let size = terminal.size()?;
-//     let span = Span {
-//         start: 0,
-//         end: size.1 as usize,
-//     };
-//     let text_buffer = TextBuffer::new(vec![]);
-//     let frame_buffer = FrameBuffer::new(text_buffer, span);
-//     let mut editor = Editor::new(terminal, frame_buffer);
+    pub fn run(&mut self) -> Result<()> {
+        self.0.run()
+    }
 
-//     editor.initialize()?;
-//     editor.run()?;
+    fn load_config(path: &str) -> Result<Config> {
+        let contents = std::fs::read_to_string(path)?;
 
-//     Ok(())
-// }
-
-fn load_config(path: &str) -> Result<Config> {
-    let contents = std::fs::read_to_string(path)?;
-
-    match ron::from_str(&contents) {
-        Ok(config) => Ok(config),
-        Err(err) => Err(Error::Serde(SerdeError::Deserialize(err.to_string()))),
+        match ron::from_str(&contents) {
+            Ok(config) => Ok(config),
+            Err(err) => Err(Error::Serde(SerdeError::Deserialize(err.to_string()))),
+        }
     }
 }

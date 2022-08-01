@@ -121,10 +121,7 @@ impl TextBuffer {
     }
 
     pub fn line_remove(&mut self, row: usize, column: usize) -> Option<char> {
-        match self.get_mut(row) {
-            Some(line) => Some(line.remove(column)),
-            None => None,
-        }
+        self.get_mut(row).map(|line| line.remove(column))
     }
 
     pub fn line_remove_span(&mut self, row: usize, mut span: Span) -> Option<String> {

@@ -69,27 +69,27 @@ pub enum ColorConfig {
     AnsiValue(u8),
 }
 
-impl Into<crossterm::style::Color> for ColorConfig {
-    fn into(self) -> crossterm::style::Color {
-        match self {
-            Self::Reset => Color::Reset,
-            Self::Black => Color::Black,
-            Self::DarkGrey => Color::DarkGrey,
-            Self::Red => Color::Red,
-            Self::DarkRed => Color::DarkRed,
-            Self::Green => Color::Green,
-            Self::DarkGreen => Color::DarkGreen,
-            Self::Yellow => Color::Yellow,
-            Self::DarkYellow => Color::DarkYellow,
-            Self::Blue => Color::Blue,
-            Self::DarkBlue => Color::DarkBlue,
-            Self::Magenta => Color::Magenta,
-            Self::DarkMagenta => Color::DarkMagenta,
-            Self::Cyan => Color::Cyan,
-            Self::DarkCyan => Color::DarkCyan,
-            Self::White => Color::White,
-            Self::Rgb { r, g, b } => Color::Rgb { r, g, b },
-            Self::AnsiValue(value) => Color::AnsiValue(value),
+impl From<ColorConfig> for Color {
+    fn from(color_config: ColorConfig) -> Self {
+        match color_config {
+            ColorConfig::Reset => Self::Reset,
+            ColorConfig::Black => Self::Black,
+            ColorConfig::DarkGrey => Self::DarkGrey,
+            ColorConfig::Red => Self::Red,
+            ColorConfig::DarkRed => Self::DarkRed,
+            ColorConfig::Green => Self::Green,
+            ColorConfig::DarkGreen => Self::DarkGreen,
+            ColorConfig::Yellow => Self::Yellow,
+            ColorConfig::DarkYellow => Self::DarkYellow,
+            ColorConfig::Blue => Self::Blue,
+            ColorConfig::DarkBlue => Self::DarkBlue,
+            ColorConfig::Magenta => Self::Magenta,
+            ColorConfig::DarkMagenta => Self::DarkMagenta,
+            ColorConfig::Cyan => Self::Cyan,
+            ColorConfig::DarkCyan => Self::DarkCyan,
+            ColorConfig::White => Self::White,
+            ColorConfig::Rgb { r, g, b } => Self::Rgb { r, g, b },
+            ColorConfig::AnsiValue(value) => Self::AnsiValue(value),
         }
     }
 }

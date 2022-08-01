@@ -7,7 +7,6 @@ use crossterm::{
 use std::{
     fmt::Display,
     io::{self, Stdout},
-    rc::Rc,
 };
 
 pub enum Move {
