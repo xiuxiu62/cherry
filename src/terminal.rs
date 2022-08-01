@@ -84,10 +84,8 @@ impl Terminal {
         self.execute(style::Print(data))
     }
 
-    pub fn delete_current(&mut self) -> Result<()> {
-        self.write(' ')?;
-
-        self.cursor_move(Move::Left(1))
+    pub fn clear(&mut self) -> Result<()> {
+        self.execute(terminal::Clear(ClearType::All))
     }
 
     #[inline]

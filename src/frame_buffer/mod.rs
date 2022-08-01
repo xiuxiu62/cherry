@@ -1,12 +1,17 @@
-use crate::{error::Result, text_buffer::TextBuffer, Span};
+use crate::{error::Result, Span};
 use std::{
     fmt::{Debug, Display},
     path::PathBuf,
 };
 
+mod text_buffer;
+use text_buffer::TextBuffer;
+
+// TODO: consider making position (u16, u16) for easier
+// arithmetic with terminal internals
 pub struct FrameBuffer {
     text_buffer: TextBuffer,
-    pub position: (usize, usize),
+    pub position: (u16, u16),
     pub viewable_rows: Span,
 }
 
