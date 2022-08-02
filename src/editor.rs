@@ -7,6 +7,7 @@ use crate::{
 use crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
+use tracing::info;
 
 pub enum Message {
     Continue,
@@ -21,35 +22,36 @@ pub enum Mode {
 
 pub struct Editor {
     terminal: Terminal,
-    buffer: FrameBuffer,
-    config: Config,
+    pub buffer: FrameBuffer,
     mode: Mode,
 }
 
 impl Editor {
     #[inline]
-    pub fn new(terminal: Terminal, mut buffer: FrameBuffer, config: Config) -> Self {
+    pub fn new(terminal: Terminal, mut buffer: FrameBuffer) -> Self {
+        info!("[EDITOR] (new) start");
         buffer.viewable_rows = Span {
             start: 0,
             end: terminal.size.1 as usize,
         };
 
+        info!("[EDITOR] (new) end");
         Self {
             terminal,
             buffer,
-            config,
             mode: Mode::Normal,
         }
     }
 
     #[inline]
     pub fn initialize(&mut self) -> Result<()> {
-        self.terminal.initialize(&self.config)?;
-        self.terminal.clear()?;
-        self.terminal.cursor_reset()?;
+        info!("[EDITOR] (initialize) start");
+        self.terminal.initialize()?;
         self.terminal.write(self.buffer.format_viewable())?;
+        self.terminal.cursor_reset()?;
 
-        self.terminal.cursor_reset()
+        info!("[EDITOR] (initialize) end");
+        Ok(())
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -72,8 +74,16 @@ impl Editor {
     }
 
     fn handle_key_event(&mut self, event: KeyEvent) -> Result<Message> {
+        match self.mode {
+            Mode::Insert => self.handle_insert_mode_key_event(event),
+            Mode::Normal => self.handle_normal_mode_key_event(event),
+            Mode::Visual => Ok(Message::Continue),
+        }
+    }
+
+    fn handle_insert_mode_key_event(&mut self, event: KeyEvent) -> Result<Message> {
         match (event.code, event.modifiers) {
-            (KeyCode::Char('c'), KeyModifiers::CONTROL) => return Ok(Message::Stop),
+            (KeyCode::Esc, KeyModifiers::NONE) => self.mode = Mode::Normal,
             (KeyCode::Left, KeyModifiers::NONE) => self.move_left()?,
             (KeyCode::Right, KeyModifiers::NONE) => self.move_right()?,
             (KeyCode::Up, KeyModifiers::NONE) => self.move_up()?,
@@ -81,7 +91,21 @@ impl Editor {
             (KeyCode::Backspace, KeyModifiers::NONE) => self.delete_last()?,
             (KeyCode::Enter, KeyModifiers::NONE) => self.newline()?,
             (KeyCode::Tab, KeyModifiers::NONE) => self.tab()?,
-            (code, KeyModifiers::NONE | KeyModifiers::SHIFT) => self.write(code)?,
+            (code, KeyModifiers::NONE | KeyModifiers::SHIFT) => self.write_char(code)?,
+            _ => {}
+        };
+
+        Ok(Message::Continue)
+    }
+
+    fn handle_normal_mode_key_event(&mut self, event: KeyEvent) -> Result<Message> {
+        match (event.code, event.modifiers) {
+            (KeyCode::Char('i'), KeyModifiers::NONE) => self.mode = Mode::Insert,
+            (KeyCode::Char('c'), KeyModifiers::CONTROL) => return Ok(Message::Stop),
+            (KeyCode::Left | KeyCode::Char('h'), KeyModifiers::NONE) => self.move_left()?,
+            (KeyCode::Right | KeyCode::Char('l'), KeyModifiers::NONE) => self.move_right()?,
+            (KeyCode::Up | KeyCode::Char('k'), KeyModifiers::NONE) => self.move_up()?,
+            (KeyCode::Down | KeyCode::Char('j'), KeyModifiers::NONE) => self.move_down()?,
             _ => {}
         };
 
@@ -123,7 +147,11 @@ impl Editor {
         }
 
         if self.buffer.position.1 > 0 {
-            self.buffer.position.0 = self.terminal.size.0;
+            let column = match self.buffer.get_previous() {
+                Some(line) => line.len() as u16 + 1,
+                None => 0,
+            };
+            self.buffer.position.0 = column;
             self.buffer.position.1 -= 1;
 
             return self
@@ -165,10 +193,12 @@ impl Editor {
         self.terminal.cursor_move(Move::Down(1))
     }
 
-    fn write(&mut self, keycode: KeyCode) -> Result<()> {
+    fn write_char(&mut self, keycode: KeyCode) -> Result<()> {
         match CHAR_MAP.get(&keycode) {
             Some(value) => {
-                self.buffer.position.0 += 1;
+                let (row, column) = self.buffer.position;
+                self.buffer
+                    .line_insert(row as usize, column as usize, *value);
 
                 self.terminal.write(value)
             }
@@ -194,11 +224,5 @@ impl Editor {
         self.terminal.write(' ')?;
 
         self.move_left()
-    }
-}
-
-impl Drop for Editor {
-    fn drop(&mut self) {
-        println!("{}", self.buffer);
     }
 }

@@ -24,6 +24,18 @@ impl FrameBuffer {
         }
     }
 
+    pub fn get_previous(&self) -> Option<&String> {
+        self.text_buffer.get(self.position.1 as usize - 1)
+    }
+
+    pub fn get_current(&self) -> Option<&String> {
+        self.text_buffer.get(self.position.1 as usize)
+    }
+
+    pub fn get_next(&self) -> Option<&String> {
+        self.text_buffer.get(self.position.1 as usize + 1)
+    }
+
     pub fn try_from_path(path: PathBuf, viewable_rows: Span) -> Result<Self> {
         let text_buffer = TextBuffer::try_from(path)?;
 
@@ -67,7 +79,19 @@ impl FrameBuffer {
     }
 
     pub fn format_viewable(&self) -> String {
-        self.text_buffer.format_span(self.viewable_rows.clone())
+        let view_span = &self.viewable_rows;
+        let format_number = |i: usize| match i {
+            i if i >= 1000 => i.to_string(),
+            i if i >= 100 => format!(" {i}"),
+            i if i >= 10 => format!("  {i}"),
+            i => format!("   {i}"),
+        };
+
+        (view_span.start..=view_span.end)
+            .zip(self.text_buffer.format_span(view_span))
+            .into_iter()
+            .map(|(i, line)| format!("{} {line}", format_number(i)))
+            .collect()
     }
 }
 

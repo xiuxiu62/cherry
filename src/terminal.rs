@@ -8,6 +8,7 @@ use std::{
     fmt::Display,
     io::{self, Stdout},
 };
+use tracing::info;
 
 pub enum Move {
     Left(u16),
@@ -21,57 +22,66 @@ pub enum Move {
 
 pub struct Terminal {
     stdout: Stdout,
-    // config: Rc<Config>,
+    config: Config,
     pub size: (u16, u16),
     alternate_screen: bool,
 }
 
 impl Terminal {
     #[inline]
-    pub fn new() -> Result<Self> {
-        Ok(Self {
+    pub fn new(config: Config) -> Result<Self> {
+        info!("[TERMINAL] (new) start");
+        let terminal = Self {
             stdout: io::stdout(),
+            config,
             size: terminal::size()?,
             alternate_screen: false,
-        })
+        };
+
+        info!("[TERMINAL] (new) end");
+        Ok(terminal)
     }
 
-    pub fn initialize(&mut self, config: &Config) -> Result<()> {
+    pub fn initialize(&mut self) -> Result<()> {
+        info!("[TERMINAL] (initialize) start");
         self.enable_raw_mode()?;
-        self.initialize_terminal(config)?;
+        self.initialize_terminal()?;
+        self.initialize_theme()?;
+        self.cursor_reset()?;
 
-        self.initialize_theme(config)
+        info!("[TERMINAL] (initialize) end");
+        Ok(())
     }
 
-    fn initialize_terminal(&mut self, config: &Config) -> Result<()> {
-        if config.alternate_screen {
+    fn initialize_terminal(&mut self) -> Result<()> {
+        if self.config.alternate_screen {
             self.alternate_screen = true;
             self.execute(terminal::EnterAlternateScreen)?;
         } else {
-            self.execute(terminal::Clear(ClearType::All))?;
+            self.clear()?;
         }
 
-        if config.line_wrapping {
+        if self.config.line_wrapping {
             self.execute(terminal::EnableLineWrap)?;
         }
 
-        if config.mouse_capture {
+        if self.config.mouse_capture {
             self.execute(event::EnableMouseCapture)?;
         }
 
         Ok(())
     }
 
-    fn initialize_theme(&mut self, config: &Config) -> Result<()> {
-        if let Some(color) = config.theme.foreground_color {
+    fn initialize_theme(&mut self) -> Result<()> {
+        if let Some(color) = self.config.theme.foreground_color {
             self.execute(style::SetForegroundColor(color.into()))?;
         }
 
-        if let Some(color) = config.theme.background_color {
+        if let Some(color) = self.config.theme.background_color {
             self.execute(style::SetBackgroundColor(color.into()))?;
         }
 
-        if let Some(color) = config.theme.underline_color {
+        if let Some(color) = self.config.theme.underline_color {
             self.execute(style::SetUnderlineColor(color.into()))?;
         }
 

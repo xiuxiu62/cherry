@@ -143,16 +143,11 @@ impl TextBuffer {
         }
     }
 
-    pub fn format_span(&self, span: Span) -> String {
-        span.into_iter()
-            .map(|i| {
-                format!(
-                    "{}\r\n",
-                    match self.get(i) {
-                        Some(line) => line,
-                        None => "",
-                    }
-                )
+    pub fn format_span(&self, span: &Span) -> Vec<String> {
+        (span.start..=span.end)
+            .map(|i| match self.get(i) {
+                Some(line) => format!("{line}\r\n"),
+                None => "\r\n".to_owned(),
             })
             .collect()
     }
