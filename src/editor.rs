@@ -1,8 +1,8 @@
 use crate::{
     error::Result,
-    frame_buffer::{FrameBuffer, Row, GUTTER_WIDTH},
+    frame_buffer::{FrameBuffer, GUTTER_WIDTH},
     terminal::{Move, Terminal},
-    util, Span, CHAR_MAP,
+    Span, CHAR_MAP,
 };
 use crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -29,7 +29,6 @@ pub struct Editor {
 }
 
 impl Editor {
-    #[inline]
     pub fn new(terminal: Terminal, mut buffer: FrameBuffer) -> Self {
         info!("[EDITOR] (new) start");
         buffer.viewable_rows = Span {
@@ -45,10 +44,10 @@ impl Editor {
         }
     }
 
-    #[inline]
+    // TODO: update start position once frame splitting is implemented
     pub fn initialize(&mut self) -> Result<()> {
         info!("[EDITOR] (initialize) start");
-        self.terminal.initialize()?;
+        self.terminal.initialize(0, 0)?;
 
         let data = self.buffer.format_viewable();
         self.terminal.write(data)?;
@@ -69,6 +68,7 @@ impl Editor {
         Ok(())
     }
 
+    #[inline]
     pub fn handle_event(&mut self, event: &Event) -> Result<Message> {
         match *event {
             Event::Key(event) => self.handle_key_event(event),
@@ -77,6 +77,7 @@ impl Editor {
         }
     }
 
+    #[inline]
     fn handle_key_event(&mut self, event: KeyEvent) -> Result<Message> {
         match self.mode {
             Mode::Insert => self.handle_insert_mode_key_event(event),
@@ -85,6 +86,7 @@ impl Editor {
         }
     }
 
+    #[inline]
     fn handle_insert_mode_key_event(&mut self, event: KeyEvent) -> Result<Message> {
         match (event.code, event.modifiers) {
             (KeyCode::Esc, KeyModifiers::NONE) => self.mode = Mode::Normal,
@@ -102,6 +104,7 @@ impl Editor {
         Ok(Message::Continue)
     }
 
+    #[inline]
     fn handle_normal_mode_key_event(&mut self, event: KeyEvent) -> Result<Message> {
         match (event.code, event.modifiers) {
             (KeyCode::Char('i'), KeyModifiers::NONE) => self.mode = Mode::Insert,
@@ -185,6 +188,12 @@ impl Editor {
         self.terminal.cursor_move(Move::Down(1))
     }
 
+    // fn write(&mut self, str: &str) -> Result<()> {
+    //     if str == util::newline() {}
+
+    //     Ok(())
+    // }
+
     fn write_char(&mut self, keycode: KeyCode) -> Result<()> {
         match CHAR_MAP.get(&keycode) {
             Some(value) => {
@@ -199,11 +208,10 @@ impl Editor {
     }
 
     fn newline(&mut self) -> Result<()> {
-        // self.buffer.position.0 = 0;
-        // self.buffer.position.1 += 1;
+        let next_row = self.buffer.position.1 + 1;
+        self.buffer.insert(next_row as usize, "");
 
-        // self.terminal.write(util::newline())?;
-        self.move_to(0, self.buffer.position.1 + 1)
+        self.move_to(0, next_row)
     }
 
     fn tab(&mut self) -> Result<()> {

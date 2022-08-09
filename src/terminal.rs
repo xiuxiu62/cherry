@@ -41,12 +41,12 @@ impl Terminal {
         Ok(terminal)
     }
 
-    pub fn initialize(&mut self) -> Result<()> {
+    pub fn initialize(&mut self, start_x: u16, start_y: u16) -> Result<()> {
         info!("[TERMINAL] (initialize) start");
         self.enable_raw_mode()?;
         self.initialize_terminal()?;
         self.initialize_theme()?;
-        self.cursor_reset()?;
+        self.cursor_move_to(start_x, start_y)?;
 
         info!("[TERMINAL] (initialize) end");
         Ok(())
@@ -105,10 +105,10 @@ impl Terminal {
         Cursor::move_to(self, column, row)
     }
 
-    #[inline]
-    pub fn cursor_reset(&mut self) -> Result<()> {
-        Cursor::reset(self)
-    }
+    // #[inline]
+    // pub fn cursor_reset(&mut self) -> Result<()> {
+    //     Cursor::reset(self)
+    // }
 
     #[inline]
     pub fn size(&self) -> Result<(u16, u16)> {

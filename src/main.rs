@@ -1,60 +1,56 @@
-use std::path::PathBuf;
+#![deny(unsafe_code)]
 
 use cherry::{
     error::{Error, Result, SerdeError},
     Config, Editor, FrameBuffer, Span, Terminal,
 };
+use std::path::PathBuf;
+use structopt::StructOpt;
 
-const DEFAULT_CONFIG: &str = "config.ron";
+const DEFAULT_CONFIG: &str = "~/.config/cherry/config.ron";
+
+#[derive(Debug, StructOpt)]
+struct Options {
+    #[structopt(short, long, parse(from_os_str), about = "Alternate config path")]
+    pub config: Option<PathBuf>,
+    #[structopt(parse(from_os_str), about = "Entry to be edited")]
+    pub path: Option<PathBuf>,
+}
 
 fn main() -> Result<()> {
     // tracing_subscriber::fmt::init();
-    let mut app = App::new()?;
-    app.run()?;
+    let options = Options::from_args();
+    let config = {
+        let path = match options.config {
+            Some(path) => path,
+            None => PathBuf::from(DEFAULT_CONFIG),
+        };
 
-    let message = format!("{app:#?}");
-    drop(app);
+        load_config(path)
+    }?;
 
+    let terminal = Terminal::new(config)?;
+    let view_span = Span {
+        start: 0,
+        end: terminal.size()?.1 as usize,
+    };
+    let buffer = match options.path {
+        Some(path) => FrameBuffer::try_from_path(path, view_span)?,
+        None => FrameBuffer::new(vec![], view_span),
+    };
+
+    let mut editor = Editor::new(terminal, buffer);
+    editor.initialize()?;
+    editor.run()?;
+
+    let message = format!("{}", editor.buffer);
+    drop(editor);
     println!("{message}");
 
     Ok(())
 }
 
-fn _raw_terminal() -> Result<()> {
-    let config = load_config(DEFAULT_CONFIG)?;
-    let mut terminal = Terminal::new(config)?;
-
-    terminal.initialize()?;
-    std::thread::sleep(std::time::Duration::from_millis(1000));
-
-    Ok(())
-}
-
-#[derive(Debug)]
-struct App(Editor);
-
-impl App {
-    pub fn new() -> Result<Self> {
-        let config = load_config(DEFAULT_CONFIG)?;
-        let terminal = Terminal::new(config)?;
-
-        let view_span = Span {
-            start: 0,
-            end: terminal.size()?.1 as usize,
-        };
-        let buffer = FrameBuffer::try_from_path(PathBuf::from("config.ron"), view_span)?;
-        let mut editor = Editor::new(terminal, buffer);
-        editor.initialize()?;
-
-        Ok(Self(editor))
-    }
-
-    pub fn run(&mut self) -> Result<()> {
-        self.0.run()
-    }
-}
-
-fn load_config(path: &str) -> Result<Config> {
+fn load_config(path: PathBuf) -> Result<Config> {
     let contents = std::fs::read_to_string(path)?;
 
     match ron::from_str(&contents) {

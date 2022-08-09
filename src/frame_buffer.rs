@@ -12,13 +12,13 @@ pub enum Row {
 
 #[derive(Debug)]
 pub struct FrameBuffer {
-    text_buffer: Vec<Option<String>>,
+    text_buffer: Vec<String>,
     pub position: (u16, u16),
     pub viewable_rows: Span,
 }
 
 impl FrameBuffer {
-    pub fn new(text_buffer: Vec<Option<String>>, viewable_rows: Span) -> Self {
+    pub fn new(text_buffer: Vec<String>, viewable_rows: Span) -> Self {
         Self {
             text_buffer,
             position: (0, 0),
@@ -33,52 +33,31 @@ impl FrameBuffer {
         Ok(Self::new(text_buffer, viewable_rows))
     }
 
-    fn text_buffer_from_str(data: &str) -> Vec<Option<String>> {
+    fn text_buffer_from_str(data: &str) -> Vec<String> {
         data.split(util::newline())
             .map(|line| match line.len() {
-                0 => None,
-                _ => Some(line.to_owned()),
+                0 => "".to_owned(),
+                _ => line.to_owned(),
             })
             .collect()
     }
 
     pub fn get(&self, row: Row) -> Option<&String> {
         match row {
-            Row::Previous => self._get(self.position.1 as usize - 1),
-            Row::Current => self._get(self.position.1 as usize),
-            Row::Next => self._get(self.position.1 as usize + 1),
-            Row::Index(i) => self._get(i as usize),
+            Row::Previous => self.text_buffer.get(self.position.1 as usize - 1),
+            Row::Current => self.text_buffer.get(self.position.1 as usize),
+            Row::Next => self.text_buffer.get(self.position.1 as usize + 1),
+            Row::Index(i) => self.text_buffer.get(i as usize),
         }
     }
 
-    fn _get(&self, i: usize) -> Option<&String> {
-        if let Some(line) = self.text_buffer.get(i) {
-            match line {
-                Some(line) => return Some(line),
-                None => return None,
-            }
-        }
-
-        None
-    }
     pub fn get_mut(&mut self, row: Row) -> Option<&mut String> {
         match row {
-            Row::Previous => self._get_mut(self.position.1 as usize - 1),
-            Row::Current => self._get_mut(self.position.1 as usize),
-            Row::Next => self._get_mut(self.position.1 as usize + 1),
-            Row::Index(i) => self._get_mut(i as usize),
+            Row::Previous => self.text_buffer.get_mut(self.position.1 as usize - 1),
+            Row::Current => self.text_buffer.get_mut(self.position.1 as usize),
+            Row::Next => self.text_buffer.get_mut(self.position.1 as usize + 1),
+            Row::Index(i) => self.text_buffer.get_mut(i as usize),
         }
-    }
-
-    fn _get_mut(&mut self, i: usize) -> Option<&mut String> {
-        if let Some(line) = self.text_buffer.get_mut(i) {
-            match line {
-                Some(line) => return Some(line),
-                None => return None,
-            }
-        }
-
-        None
     }
 
     pub fn len(&self) -> usize {
@@ -86,7 +65,7 @@ impl FrameBuffer {
     }
 
     pub fn line_len(&self, row: usize) -> usize {
-        match self._get(row) {
+        match self.get(Row::Index(row)) {
             Some(line) => line.len(),
             None => 0,
         }
@@ -95,23 +74,28 @@ impl FrameBuffer {
     pub fn insert(&mut self, row: usize, data: &str) {
         let len = self.len();
         if row < len {
-            self.text_buffer.insert(row, Some(data.to_owned()));
+            self.text_buffer.insert(row, data.to_owned());
+
             return;
         }
 
-        (len..row).for_each(|_| self.text_buffer.push(None));
+        (len..row).for_each(|_| self.text_buffer.push("".to_owned()));
         self.append(data);
     }
 
     pub fn append(&mut self, data: &str) {
-        self.text_buffer.push(Some(data.to_owned()));
+        self.text_buffer.push(data.to_owned());
     }
 
     pub fn remove(&mut self, row: usize) -> Option<String> {
-        self.text_buffer.remove(row)
+        if row < self.len() {
+            return Some(self.text_buffer.remove(row));
+        }
+
+        None
     }
 
-    pub fn remove_span(&mut self, span: Span) -> Vec<Option<String>> {
+    pub fn remove_span(&mut self, span: Span) -> Vec<String> {
         if span.start <= span.end && span.end < self.len() {
             return self.text_buffer.drain(span).collect();
         }
@@ -120,7 +104,7 @@ impl FrameBuffer {
     }
 
     pub fn line_insert(&mut self, row: usize, column: usize, character: char) {
-        match self._get_mut(row) {
+        match self.get_mut(Row::Index(row)) {
             Some(line) => {
                 let len = line.len();
                 if column < len {
@@ -141,7 +125,7 @@ impl FrameBuffer {
     }
 
     pub fn line_insert_str(&mut self, row: usize, column: usize, segment: &str) {
-        match self._get_mut(row) {
+        match self.get_mut(Row::Index(row)) {
             Some(line) => {
                 let len = line.len();
                 if column < len {
@@ -166,28 +150,33 @@ impl FrameBuffer {
     }
 
     pub fn line_append(&mut self, row: usize, character: char) {
-        match self._get_mut(row) {
+        match self.get_mut(Row::Index(row)) {
             Some(line) => line.push(character),
             None => self.insert(row, character.to_string().as_str()),
         }
     }
 
     pub fn line_append_str(&mut self, row: usize, segment: &str) {
-        match self._get_mut(row) {
+        match self.get_mut(Row::Index(row)) {
             Some(line) => line.push_str(segment),
             None => self.insert(row, segment),
         }
     }
 
     pub fn line_remove(&mut self, row: usize, column: usize) -> Option<char> {
-        self._get_mut(row).map(|line| line.remove(column))
+        if self.line_len(row) < column {
+            return self
+                .get_mut(Row::Index(row))
+                .map(|line| line.remove(column));
+        }
+
+        None
     }
 
     pub fn line_remove_span(&mut self, row: usize, mut span: Span) -> Option<String> {
-        match self._get_mut(row) {
+        match self.get_mut(Row::Index(row)) {
             Some(line) => {
                 let len = line.len();
-
                 if len == 0 || span.start >= len {
                     return None;
                 }
@@ -220,7 +209,7 @@ impl FrameBuffer {
 
     fn format_span(&self, span: &Span) -> Vec<String> {
         (span.start..=span.end)
-            .map(|i| match self._get(i) {
+            .map(|i| match self.get(Row::Index(i)) {
                 Some(line) => format!("{line}{}", util::newline()),
                 None => util::newline().to_owned(),
             })
@@ -230,13 +219,11 @@ impl FrameBuffer {
 
 impl Display for FrameBuffer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let data = self
-            .format_span(&Span {
-                start: 0,
-                end: self.len(),
-            })
-            .join(util::newline());
-
+        let span = Span {
+            start: 0,
+            end: self.len(),
+        };
+        let data = self.format_span(&span).join(util::newline());
         let message = format!(
             r#"FrameBuffer: {{
   position:  ({}, {}),
