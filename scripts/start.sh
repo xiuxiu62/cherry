@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cargo run -- config.ron --config config.ron
+cargo run -- --config config.ron

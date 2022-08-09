@@ -13,6 +13,7 @@ pub enum Row {
 #[derive(Debug)]
 pub struct FrameBuffer {
     text_buffer: Vec<String>,
+    // (column, row)
     pub position: (u16, u16),
     pub viewable_rows: Span,
 }
@@ -80,10 +81,6 @@ impl FrameBuffer {
         }
 
         (len..row).for_each(|_| self.text_buffer.push("".to_owned()));
-        self.append(data);
-    }
-
-    pub fn append(&mut self, data: &str) {
         self.text_buffer.push(data.to_owned());
     }
 
@@ -225,11 +222,11 @@ impl Display for FrameBuffer {
         };
         let data = self.format_span(&span).join(util::newline());
         let message = format!(
-            r#"FrameBuffer: {{
+            "FrameBuffer: {{
   position:  ({}, {}),
   view_span: ({}, {}),
 {}
-}}"#,
+}}",
             self.position.0,
             self.position.1,
             self.viewable_rows.start,

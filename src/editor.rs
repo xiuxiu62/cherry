@@ -1,6 +1,6 @@
 use crate::{
     error::Result,
-    frame_buffer::{FrameBuffer, GUTTER_WIDTH},
+    frame_buffer::{FrameBuffer, Row, GUTTER_WIDTH},
     terminal::{Move, Terminal},
     Span, CHAR_MAP,
 };
@@ -28,6 +28,7 @@ pub struct Editor {
     mode: Mode,
 }
 
+// TODO: spin all conversions into base methods and refactor position data to be uniform
 impl Editor {
     pub fn new(terminal: Terminal, mut buffer: FrameBuffer) -> Self {
         info!("[EDITOR] (new) start");
@@ -152,47 +153,52 @@ impl Editor {
             return self.terminal.cursor_move(Move::Left(1));
         }
 
-        if self.buffer.position.1 > 0 {
-            let row = self.buffer.position.1 - 1;
-            let column = self.buffer.line_len(row as usize);
-
-            return self.move_to(column as u16, self.buffer.position.1 - 1);
+        if self.buffer.position.1 == 0 {
+            return Ok(());
         }
 
-        Ok(())
+        match self.buffer.get(Row::Previous) {
+            Some(line) => self.move_to(line.len() as u16, self.buffer.position.1 - 1),
+            None => self.move_to(0, self.buffer.position.1 - 1),
+        }
     }
 
     fn move_right(&mut self) -> Result<()> {
-        if self.buffer.position.0 == self.terminal.size.0 {
-            self.move_to(0, self.buffer.position.1 + 1)?;
+        if let Some(line) = self.buffer.get(Row::Current) {
+            if self.buffer.position.0 < line.len() as u16 {
+                self.buffer.position.0 += 1;
+                self.terminal.cursor_move(Move::Right(1))?;
+
+                return Ok(());
+            }
         }
 
-        self.buffer.position.0 += 1;
-
-        self.terminal.cursor_move(Move::Right(1))
+        self.move_to(0, self.buffer.position.1 + 1)
     }
 
     fn move_up(&mut self) -> Result<()> {
-        if self.buffer.position.1 > 0 {
-            self.buffer.position.1 -= 1;
-
-            return self.terminal.cursor_move(Move::Up(1));
+        if self.buffer.position.1 == 0 {
+            return Ok(());
         }
 
-        Ok(())
+        let row = self.buffer.position.1 - 1;
+        let column = match self.buffer.get(Row::Next) {
+            Some(line) => line.len() as u16,
+            None => 0,
+        };
+
+        self.move_to(column, row)
     }
 
     fn move_down(&mut self) -> Result<()> {
-        self.buffer.position.1 += 1;
+        let row = self.buffer.position.1 + 1;
+        let column = match self.buffer.get(Row::Next) {
+            Some(line) => line.len() as u16,
+            None => 0,
+        };
 
-        self.terminal.cursor_move(Move::Down(1))
+        self.move_to(column, row)
     }
-
-    // fn write(&mut self, str: &str) -> Result<()> {
-    //     if str == util::newline() {}
-
-    //     Ok(())
-    // }
 
     fn write_char(&mut self, keycode: KeyCode) -> Result<()> {
         match CHAR_MAP.get(&keycode) {
