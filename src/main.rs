@@ -44,11 +44,11 @@ fn main() -> Result<()> {
     editor.run()?;
 
     let message = format!("{}", editor.buffer);
-    let history = mem::take(&mut editor.history);
+    let history = editor.format_history();
     drop(editor);
 
     println!("{message}\n");
-    println!("{history:#?}",);
+    println!("{history}",);
 
     Ok(())
 }

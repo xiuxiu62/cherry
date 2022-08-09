@@ -1,10 +1,32 @@
 use crate::{
-    editor::{HistoryNode, Mode, Move},
+    editor::{Mode, Move},
     error::Result,
     frame_buffer::{Row, GUTTER_WIDTH},
     Editor, CHAR_MAP,
 };
 use crossterm::event::KeyCode;
+use std::fmt::Display;
+
+pub enum Message {
+    Continue,
+    Exit,
+}
+
+#[derive(Debug)]
+pub struct HistoryNode {
+    action: Action,
+    positon: (u16, u16),
+}
+
+impl Display for HistoryNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Action: {}\nPosition: ({}, {})",
+            self.action, self.positon.0, self.positon.1
+        )
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Action {
@@ -23,6 +45,31 @@ pub enum Action {
     None,
 }
 
+impl Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::ChangeMode(Mode::Insert) => "Insert Mode",
+            Self::ChangeMode(Mode::Normal) => "Normal Mode",
+            Self::ChangeMode(Mode::Visual) => "Visual Mode",
+            Self::MoveRight => "Move Right",
+            Self::MoveLeft => "Move Left",
+            Self::MoveUp => "Move Up",
+            Self::MoveDown => "Move Down",
+            Self::MoveTo(column, row) => return write!(f, "Move `({column}, {row})`"),
+            Self::Write(char) => return write!(f, "Write `{char:?}`"),
+            Self::Newline => "Newline",
+            Self::Tab => "Tab",
+            Self::DeleteLast => "Delete Last",
+            Self::DeleteCurrent => "Delete Current",
+            Self::Exit => "Exit",
+            Self::None => "None",
+        };
+
+        write!(f, "{message}")
+    }
+}
+
+// TODO: spin all conversions into base methods and refactor position data to be uniform
 impl Action {
     pub fn execute(self, editor: &mut Editor) -> Result<Message> {
         editor.history.push(HistoryNode {
@@ -50,32 +97,7 @@ impl Action {
     }
 }
 
-pub enum Message {
-    Continue,
-    Exit,
-}
-
 impl Editor {
-    // pub fn execute(&mut self, action: Action) -> Result<Message> {
-    //     match action {
-    //         Action::ChangeMode(mode) => self.change_mode(mode),
-    //         Action::MoveLeft => self.move_left()?,
-    //         Action::MoveRight => self.move_right()?,
-    //         Action::MoveUp => self.move_up()?,
-    //         Action::MoveDown => self.move_down()?,
-    //         Action::MoveTo(column, row) => self.move_to(column, row)?,
-    //         Action::Write(code) => self.write_char(code)?,
-    //         Action::Newline => self.newline()?,
-    //         Action::Tab => self.tab()?,
-    //         Action::DeleteLast => self.delete_last()?,
-    //         Action::DeleteCurrent => self.delete_current()?,
-    //         Action::Exit => return Ok(Message::Exit),
-    //         Action::None => return Ok(Message::Continue),
-    //     };
-
-    //     Ok(Message::Continue)
-    // }
-
     fn change_mode(&mut self, mode: Mode) {
         self.mode = mode;
     }

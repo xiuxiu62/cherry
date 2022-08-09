@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     error::Result,
     frame_buffer::{FrameBuffer, GUTTER_WIDTH},
@@ -13,7 +15,7 @@ mod action;
 
 use action::Action;
 
-use self::action::Message;
+use self::action::{HistoryNode, Message};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
@@ -34,20 +36,13 @@ pub enum Move {
 }
 
 #[derive(Debug)]
-pub struct HistoryNode {
-    action: Action,
-    positon: (u16, u16),
-}
-
-#[derive(Debug)]
 pub struct Editor {
     terminal: Terminal,
     pub buffer: FrameBuffer,
     mode: Mode,
-    pub history: Vec<HistoryNode>,
+    history: Vec<HistoryNode>,
 }
 
-// TODO: spin all conversions into base methods and refactor position data to be uniform
 impl Editor {
     pub fn new(terminal: Terminal, mut buffer: FrameBuffer) -> Self {
         info!("[EDITOR] (new) start");
@@ -65,6 +60,17 @@ impl Editor {
         }
     }
 
+    pub fn run(&mut self) -> Result<()> {
+        loop {
+            let event = event::read()?;
+            if let Message::Exit = self.handle_event(&event)? {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
     // TODO: update start position once frame splitting is implemented
     pub fn initialize(&mut self) -> Result<()> {
         info!("[EDITOR] (initialize) start");
@@ -78,15 +84,11 @@ impl Editor {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<()> {
-        loop {
-            let event = event::read()?;
-            if let Message::Exit = self.handle_event(&event)? {
-                break;
-            }
-        }
-
-        Ok(())
+    pub fn format_history(&mut self) -> String {
+        self.history
+            .iter()
+            .map(|node| format!("{node}\n"))
+            .collect()
     }
 
     #[inline]
