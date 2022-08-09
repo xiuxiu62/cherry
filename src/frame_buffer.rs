@@ -13,8 +13,7 @@ pub enum Row {
 #[derive(Debug)]
 pub struct FrameBuffer {
     text_buffer: Vec<String>,
-    // (column, row)
-    pub position: (u16, u16),
+    pub position: (/*column*/ u16, /*row*/ u16),
     pub viewable_rows: Span,
 }
 
@@ -84,15 +83,22 @@ impl FrameBuffer {
     }
 
     pub fn insert(&mut self, row: usize, data: &str) {
-        let len = self.len();
-        if row < len {
+        let buffer_len = self.len();
+        if row < buffer_len {
             self.text_buffer.insert(row, data.to_owned());
 
             return;
         }
 
-        (len..row).for_each(|_| self.text_buffer.push("".to_owned()));
+        if row > buffer_len {
+            (buffer_len..row).for_each(|_| self.text_buffer.push("".to_owned()));
+        }
+
         self.text_buffer.push(data.to_owned());
+    }
+
+    pub fn append(&mut self, line: &str) {
+        self.text_buffer.push(line.to_owned());
     }
 
     pub fn remove(&mut self, row: usize) -> Option<String> {
@@ -111,22 +117,21 @@ impl FrameBuffer {
         vec![]
     }
 
+    // Likely culprit of the buffer write bug
     pub fn line_insert(&mut self, row: usize, column: usize, character: char) {
+        let line_len = self.line_len(row);
         match self.get_mut(Row::Index(row)) {
             Some(line) => {
-                let len = line.len();
-                if column < len {
+                if column <= line_len {
                     line.insert(column, character);
                     return;
                 }
 
-                let indent: String = (len..column).map(|_| ' ').collect();
-                line.push_str(&indent);
-                line.push(character);
+                let indent: String = (line_len..column).map(|_| ' ').collect();
+                line.push_str(&format!("{indent}{character}"));
             }
             None => {
                 let indent: String = (0..column).into_iter().map(|_| ' ').collect();
-
                 self.insert(row, &format!("{indent}{character}"));
             }
         }

@@ -15,7 +15,7 @@ pub enum Message {
 #[derive(Debug)]
 pub struct HistoryNode {
     action: Action,
-    positon: (u16, u16),
+    position: (u16, u16),
 }
 
 impl Display for HistoryNode {
@@ -23,7 +23,7 @@ impl Display for HistoryNode {
         writeln!(
             f,
             "Action: {}\nPosition: ({}, {})",
-            self.action, self.positon.0, self.positon.1
+            self.action, self.position.0, self.position.1
         )
     }
 }
@@ -72,11 +72,6 @@ impl Display for Action {
 // TODO: spin all conversions into base methods and refactor position data to be uniform
 impl Action {
     pub fn execute(self, editor: &mut Editor) -> Result<Message> {
-        editor.history.push(HistoryNode {
-            action: self.clone(),
-            positon: editor.buffer.position,
-        });
-
         match self {
             Action::ChangeMode(mode) => editor.change_mode(mode),
             Action::MoveLeft => editor.move_left()?,
@@ -92,6 +87,11 @@ impl Action {
             Action::Exit => return Ok(Message::Exit),
             Action::None => return Ok(Message::Continue),
         };
+
+        editor.history.push(HistoryNode {
+            action: self,
+            position: editor.buffer.position,
+        });
 
         Ok(Message::Continue)
     }

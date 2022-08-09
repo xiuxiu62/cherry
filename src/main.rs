@@ -4,7 +4,7 @@ use cherry::{
     error::{Error, Result, SerdeError},
     Config, Editor, FrameBuffer, Span, Terminal,
 };
-use std::{mem, path::PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 const DEFAULT_CONFIG: &str = "~/.config/cherry/config.ron";
