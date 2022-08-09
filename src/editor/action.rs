@@ -169,7 +169,7 @@ impl Editor {
                 .line_insert(row as usize, column as usize, *value);
 
             self.terminal.write(value)?;
-            // self.buffer.position.0 += 1;
+            self.buffer.position.0 += 1;
         };
 
         Ok(())

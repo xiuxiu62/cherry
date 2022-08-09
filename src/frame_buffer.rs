@@ -236,7 +236,7 @@ impl Display for FrameBuffer {
             "FrameBuffer: {{
   position:  ({}, {}),
   view_span: ({}, {}),
-{:#?}
+{}
 }}",
             self.position.0,
             self.position.1,
