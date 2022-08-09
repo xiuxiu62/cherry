@@ -20,11 +20,11 @@ pub enum Move {
     To(u16, u16),
 }
 
+#[derive(Debug)]
 pub struct Terminal {
     stdout: Stdout,
     config: Config,
     pub size: (u16, u16),
-    alternate_screen: bool,
 }
 
 impl Terminal {
@@ -35,7 +35,6 @@ impl Terminal {
             stdout: io::stdout(),
             config,
             size: terminal::size()?,
-            alternate_screen: false,
         };
 
         info!("[TERMINAL] (new) end");
@@ -55,7 +54,6 @@ impl Terminal {
 
     fn initialize_terminal(&mut self) -> Result<()> {
         if self.config.alternate_screen {
-            self.alternate_screen = true;
             self.execute(terminal::EnterAlternateScreen)?;
         } else {
             self.clear()?;
@@ -141,10 +139,22 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        if self.alternate_screen {
+        if self.config.alternate_screen {
             if let Err(err) = self.execute(terminal::LeaveAlternateScreen) {
                 eprintln!("failed to leave alternate screen: {err}")
             };
+        }
+
+        if self.config.line_wrapping {
+            if let Err(err) = self.execute(terminal::DisableLineWrap) {
+                eprintln!("failed to disable line wrapping: {err}")
+            }
+        }
+
+        if self.config.mouse_capture {
+            if let Err(err) = self.execute(event::DisableMouseCapture) {
+                eprintln!("failed to disable mouse capture: {err}")
+            }
         }
 
         if let Err(err) = self.disable_raw_mode() {

@@ -10,9 +10,14 @@ const DEFAULT_CONFIG: &str = "config.ron";
 fn main() -> Result<()> {
     // tracing_subscriber::fmt::init();
     let mut app = App::new()?;
+    app.run()?;
 
-    // Ok(())
-    app.run()
+    let message = format!("{app:#?}");
+    drop(app);
+
+    println!("{message}");
+
+    Ok(())
 }
 
 fn _raw_terminal() -> Result<()> {
@@ -25,6 +30,7 @@ fn _raw_terminal() -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
 struct App(Editor);
 
 impl App {

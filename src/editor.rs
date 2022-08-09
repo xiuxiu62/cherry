@@ -1,8 +1,8 @@
 use crate::{
     error::Result,
-    frame_buffer::FrameBuffer,
+    frame_buffer::{FrameBuffer, Row, GUTTER_WIDTH},
     terminal::{Move, Terminal},
-    Config, Span, CHAR_MAP,
+    util, Span, CHAR_MAP,
 };
 use crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -14,12 +14,14 @@ pub enum Message {
     Stop,
 }
 
+#[derive(Debug)]
 pub enum Mode {
     Normal,
     Insert,
     Visual,
 }
 
+#[derive(Debug)]
 pub struct Editor {
     terminal: Terminal,
     pub buffer: FrameBuffer,
@@ -47,8 +49,10 @@ impl Editor {
     pub fn initialize(&mut self) -> Result<()> {
         info!("[EDITOR] (initialize) start");
         self.terminal.initialize()?;
-        self.terminal.write(self.buffer.format_viewable())?;
-        self.terminal.cursor_reset()?;
+
+        let data = self.buffer.format_viewable();
+        self.terminal.write(data)?;
+        self.terminal.cursor_move_to(GUTTER_WIDTH, 0)?;
 
         info!("[EDITOR] (initialize) end");
         Ok(())
@@ -135,10 +139,9 @@ impl Editor {
     fn move_to(&mut self, column: u16, row: u16) -> Result<()> {
         self.buffer.position = (column, row);
 
-        self.terminal.cursor_move_to(column, row)
+        self.terminal.cursor_move_to(column + GUTTER_WIDTH, row)
     }
 
-    // TODO: Tighten up some of this repetition
     fn move_left(&mut self) -> Result<()> {
         if self.buffer.position.0 > 0 {
             self.buffer.position.0 -= 1;
@@ -147,16 +150,10 @@ impl Editor {
         }
 
         if self.buffer.position.1 > 0 {
-            let column = match self.buffer.get_previous() {
-                Some(line) => line.len() as u16 + 1,
-                None => 0,
-            };
-            self.buffer.position.0 = column;
-            self.buffer.position.1 -= 1;
+            let row = self.buffer.position.1 - 1;
+            let column = self.buffer.line_len(row as usize);
 
-            return self
-                .terminal
-                .cursor_move_to(self.buffer.position.0, self.buffer.position.1);
+            return self.move_to(column as u16, self.buffer.position.1 - 1);
         }
 
         Ok(())
@@ -164,12 +161,7 @@ impl Editor {
 
     fn move_right(&mut self) -> Result<()> {
         if self.buffer.position.0 == self.terminal.size.0 {
-            self.buffer.position.0 = 0;
-            self.buffer.position.1 += 1;
-
-            return self
-                .terminal
-                .cursor_move_to(self.buffer.position.0, self.buffer.position.1);
+            self.move_to(0, self.buffer.position.1 + 1)?;
         }
 
         self.buffer.position.0 += 1;
@@ -207,10 +199,11 @@ impl Editor {
     }
 
     fn newline(&mut self) -> Result<()> {
-        self.buffer.position.0 = 0;
-        self.buffer.position.1 += 1;
+        // self.buffer.position.0 = 0;
+        // self.buffer.position.1 += 1;
 
-        self.terminal.write("\r\n")
+        // self.terminal.write(util::newline())?;
+        self.move_to(0, self.buffer.position.1 + 1)
     }
 
     fn tab(&mut self) -> Result<()> {

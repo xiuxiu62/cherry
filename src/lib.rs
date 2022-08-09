@@ -6,6 +6,7 @@ pub mod error;
 mod frame_buffer;
 mod keymap;
 mod terminal;
+mod util;
 
 pub use config::Config;
 pub use editor::Editor;
