@@ -72,6 +72,17 @@ impl FrameBuffer {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.text_buffer.is_empty()
+    }
+
+    pub fn line_is_empty(&self, row: usize) -> bool {
+        match self.get(Row::Index(row)) {
+            Some(line) => line.is_empty(),
+            None => true,
+        }
+    }
+
     pub fn insert(&mut self, row: usize, data: &str) {
         let len = self.len();
         if row < len {
@@ -225,7 +236,7 @@ impl Display for FrameBuffer {
             "FrameBuffer: {{
   position:  ({}, {}),
   view_span: ({}, {}),
-{}
+{:#?}
 }}",
             self.position.0,
             self.position.1,

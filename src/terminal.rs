@@ -1,4 +1,4 @@
-use crate::{error::Result, Config};
+use crate::{editor::Move, error::Result, Config};
 use crossterm::{
     cursor, event, style,
     terminal::{self, ClearType},
@@ -9,16 +9,6 @@ use std::{
     io::{self, Stdout},
 };
 use tracing::info;
-
-pub enum Move {
-    Left(u16),
-    Right(u16),
-    Up(u16),
-    Down(u16),
-    NextLine(u16),
-    PreviousLine(u16),
-    To(u16, u16),
-}
 
 #[derive(Debug)]
 pub struct Terminal {
