@@ -1,21 +1,17 @@
-use std::fmt::Display;
-
 use crate::{
     error::Result,
     frame_buffer::{FrameBuffer, GUTTER_WIDTH},
+    status_bar::StatusBar,
     terminal::Terminal,
     Span,
 };
 use crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
-use tracing::info;
+use std::{cell::RefCell, rc::Rc};
 
 mod action;
-
-use action::Action;
-
-use self::action::{HistoryNode, Message};
+use action::{Action, HistoryNode, Message};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
@@ -39,23 +35,31 @@ pub enum Move {
 pub struct Editor {
     terminal: Terminal,
     pub buffer: FrameBuffer,
-    mode: Mode,
+    pub status_bar: StatusBar,
+    mode: Rc<RefCell<Mode>>,
     history: Vec<HistoryNode>,
 }
 
 impl Editor {
     pub fn new(terminal: Terminal, mut buffer: FrameBuffer) -> Self {
-        info!("[EDITOR] (new) start");
         buffer.viewable_rows = Span {
             start: 0,
-            end: terminal.size.1 as usize,
+            end: terminal.size.as_ref().borrow().1 as usize - 2,
         };
 
-        info!("[EDITOR] (new) end");
+        let mode = Rc::new(RefCell::new(Mode::Normal));
+        let status_bar = StatusBar::new(
+            Rc::clone(&terminal.size),
+            Rc::clone(&mode),
+            Rc::new(RefCell::new("".to_owned())),
+            Rc::clone(&buffer.position),
+        );
+
         Self {
             terminal,
             buffer,
-            mode: Mode::Normal,
+            status_bar,
+            mode,
             history: vec![],
         }
     }
@@ -66,6 +70,8 @@ impl Editor {
             if let Message::Exit = self.handle_event(&event)? {
                 break;
             }
+
+            self.draw_status_bar()?;
         }
 
         Ok(())
@@ -73,14 +79,13 @@ impl Editor {
 
     // TODO: update start position once frame splitting is implemented
     pub fn initialize(&mut self) -> Result<()> {
-        info!("[EDITOR] (initialize) start");
         self.terminal.initialize(0, 0)?;
 
         let data = self.buffer.format_viewable();
         self.terminal.write(data)?;
+        self.draw_status_bar()?;
         self.terminal.cursor_move_to(GUTTER_WIDTH, 0)?;
 
-        info!("[EDITOR] (initialize) end");
         Ok(())
     }
 
@@ -102,7 +107,8 @@ impl Editor {
 
     #[inline]
     fn handle_key_event(&mut self, event: KeyEvent) -> Result<Message> {
-        match self.mode {
+        let mode = *self.mode.borrow();
+        match mode {
             Mode::Insert => self.handle_insert_mode_key_event(event),
             Mode::Normal => self.handle_normal_mode_key_event(event),
             Mode::Visual => Ok(Message::Continue),
@@ -142,7 +148,7 @@ impl Editor {
 
     fn handle_mouse_event(&mut self, event: MouseEvent) -> Result<Message> {
         if let MouseEventKind::Down(MouseButton::Left) = event.kind {
-            self.buffer.position = (event.row, event.row);
+            self.buffer.position.replace((event.row, event.row));
             Action::MoveTo(event.column, event.row).execute(self)?;
         };
 
@@ -150,13 +156,26 @@ impl Editor {
     }
 
     fn handle_resize_event(&mut self, width: u16, height: u16) -> Result<Message> {
-        let dy = height as i16 - self.terminal.size.1 as i16;
+        let dy = height as i16 - self.terminal.size.borrow().1 as i16;
         match dy.is_positive() {
             true => self.buffer.viewable_rows.end += dy as usize,
             false => self.buffer.viewable_rows.end -= dy as usize,
         }
-        self.terminal.size = (width, height);
+        self.terminal.size.replace((width, height));
 
         Ok(Message::Continue)
+    }
+
+    fn draw_status_bar(&mut self) -> Result<()> {
+        let rendered_bar = self.status_bar.to_string();
+        let previous_position = self.buffer.position.borrow();
+        let size = self.terminal.size.borrow().1;
+
+        self.terminal.cursor_move_to(0, size - 1)?;
+        self.terminal.write(&rendered_bar)?;
+        self.terminal
+            .cursor_move_to(previous_position.0 + GUTTER_WIDTH, previous_position.1)?;
+
+        Ok(())
     }
 }

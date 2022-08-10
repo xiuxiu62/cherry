@@ -18,7 +18,6 @@ struct Options {
 }
 
 fn main() -> Result<()> {
-    // tracing_subscriber::fmt::init();
     let options = Options::from_args();
     let config = {
         let path = match options.config {
@@ -43,11 +42,13 @@ fn main() -> Result<()> {
     editor.initialize()?;
     editor.run()?;
 
-    let message = format!("{}", editor.buffer);
+    let buffer = format!("{}", editor.buffer);
+    // let status = format!("{}", editor.status_bar);
     let history = editor.format_history();
     drop(editor);
 
-    println!("{message}\n");
+    println!("{buffer}\n");
+    // println!("{status}\n");
     println!("{history}",);
 
     Ok(())

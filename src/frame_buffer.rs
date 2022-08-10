@@ -1,5 +1,5 @@
 use crate::{error::Result, util, Span};
-use std::{fmt::Display, fs, path::PathBuf};
+use std::{cell::RefCell, fmt::Display, fs, path::PathBuf, rc::Rc};
 
 pub const GUTTER_WIDTH: u16 = 5;
 
@@ -13,7 +13,7 @@ pub enum Row {
 #[derive(Debug)]
 pub struct FrameBuffer {
     text_buffer: Vec<String>,
-    pub position: (/*column*/ u16, /*row*/ u16),
+    pub position: Rc<RefCell<(/*column*/ u16, /*row*/ u16)>>,
     pub viewable_rows: Span,
 }
 
@@ -21,7 +21,7 @@ impl FrameBuffer {
     pub fn new(text_buffer: Vec<String>, viewable_rows: Span) -> Self {
         Self {
             text_buffer,
-            position: (0, 0),
+            position: Rc::new(RefCell::new((0, 0))),
             viewable_rows,
         }
     }
@@ -44,18 +44,22 @@ impl FrameBuffer {
 
     pub fn get(&self, row: Row) -> Option<&String> {
         match row {
-            Row::Previous => self.text_buffer.get(self.position.1 as usize - 1),
-            Row::Current => self.text_buffer.get(self.position.1 as usize),
-            Row::Next => self.text_buffer.get(self.position.1 as usize + 1),
+            Row::Previous => self.text_buffer.get(self.position.borrow().1 as usize - 1),
+            Row::Current => self.text_buffer.get(self.position.borrow().1 as usize),
+            Row::Next => self.text_buffer.get(self.position.borrow().1 as usize + 1),
             Row::Index(i) => self.text_buffer.get(i as usize),
         }
     }
 
     pub fn get_mut(&mut self, row: Row) -> Option<&mut String> {
         match row {
-            Row::Previous => self.text_buffer.get_mut(self.position.1 as usize - 1),
-            Row::Current => self.text_buffer.get_mut(self.position.1 as usize),
-            Row::Next => self.text_buffer.get_mut(self.position.1 as usize + 1),
+            Row::Previous => self
+                .text_buffer
+                .get_mut(self.position.borrow().1 as usize - 1),
+            Row::Current => self.text_buffer.get_mut(self.position.borrow().1 as usize),
+            Row::Next => self
+                .text_buffer
+                .get_mut(self.position.borrow().1 as usize + 1),
             Row::Index(i) => self.text_buffer.get_mut(i as usize),
         }
     }
@@ -243,8 +247,8 @@ impl Display for FrameBuffer {
   view_span: ({}, {}),
 {}
 }}",
-            self.position.0,
-            self.position.1,
+            self.position.borrow().0,
+            self.position.borrow().1,
             self.viewable_rows.start,
             self.viewable_rows.end,
             data,

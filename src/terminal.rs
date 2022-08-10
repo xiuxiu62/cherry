@@ -5,40 +5,37 @@ use crossterm::{
     Command, ExecutableCommand,
 };
 use std::{
+    cell::RefCell,
     fmt::Display,
     io::{self, Stdout},
+    rc::Rc,
 };
-use tracing::info;
 
 #[derive(Debug)]
 pub struct Terminal {
     stdout: Stdout,
     config: Config,
-    pub size: (u16, u16),
+    pub size: Rc<RefCell<(u16, u16)>>,
 }
 
 impl Terminal {
     #[inline]
     pub fn new(config: Config) -> Result<Self> {
-        info!("[TERMINAL] (new) start");
         let terminal = Self {
             stdout: io::stdout(),
             config,
-            size: terminal::size()?,
+            size: Rc::new(RefCell::new(terminal::size()?)),
         };
 
-        info!("[TERMINAL] (new) end");
         Ok(terminal)
     }
 
     pub fn initialize(&mut self, start_x: u16, start_y: u16) -> Result<()> {
-        info!("[TERMINAL] (initialize) start");
         self.enable_raw_mode()?;
         self.initialize_terminal()?;
         self.initialize_theme()?;
         self.cursor_move_to(start_x, start_y)?;
 
-        info!("[TERMINAL] (initialize) end");
         Ok(())
     }
 
@@ -94,11 +91,6 @@ impl Terminal {
     pub fn cursor_move_to(&mut self, column: u16, row: u16) -> Result<()> {
         Cursor::move_to(self, column, row)
     }
-
-    // #[inline]
-    // pub fn cursor_reset(&mut self) -> Result<()> {
-    //     Cursor::reset(self)
-    // }
 
     #[inline]
     pub fn size(&self) -> Result<(u16, u16)> {
