@@ -4,7 +4,7 @@ use cherry::{
     error::{Error, Result, SerdeError},
     Config, Editor, FrameBuffer, Span, Terminal,
 };
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 
 const DEFAULT_CONFIG: &str = "~/.config/cherry/config.ron";
@@ -35,21 +35,15 @@ fn main() -> Result<()> {
     };
     let buffer = match options.path {
         Some(path) => FrameBuffer::try_from_path(path, view_span)?,
-        None => FrameBuffer::new(vec![], view_span),
+        None => FrameBuffer::new(vec![], None, view_span),
     };
 
     let mut editor = Editor::new(terminal, buffer);
     editor.initialize()?;
     editor.run()?;
 
-    let buffer = format!("{}", editor.buffer);
-    // let status = format!("{}", editor.status_bar);
-    let history = editor.format_history();
-    drop(editor);
-
-    println!("{buffer}\n");
-    // println!("{status}\n");
-    println!("{history}",);
+    editor.buffer.save(PathBuf::from("log/file.log"))?;
+    fs::write("log/history.log", editor.format_history())?;
 
     Ok(())
 }

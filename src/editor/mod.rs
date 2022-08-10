@@ -51,7 +51,7 @@ impl Editor {
         let status_bar = StatusBar::new(
             Rc::clone(&terminal.size),
             Rc::clone(&mode),
-            Rc::new(RefCell::new("".to_owned())),
+            Rc::clone(&buffer.entry),
             Rc::clone(&buffer.position),
         );
 

@@ -1,4 +1,7 @@
-use crate::{error::Result, util, Span};
+use crate::{
+    error::{Error, Result},
+    util, Span,
+};
 use std::{cell::RefCell, fmt::Display, fs, path::PathBuf, rc::Rc};
 
 pub const GUTTER_WIDTH: u16 = 5;
@@ -13,24 +16,29 @@ pub enum Row {
 #[derive(Debug)]
 pub struct FrameBuffer {
     text_buffer: Vec<String>,
+    pub entry: Rc<RefCell<Option<PathBuf>>>, // Directory entry being edited
     pub position: Rc<RefCell<(/*column*/ u16, /*row*/ u16)>>,
     pub viewable_rows: Span,
 }
 
 impl FrameBuffer {
-    pub fn new(text_buffer: Vec<String>, viewable_rows: Span) -> Self {
+    pub fn new(text_buffer: Vec<String>, entry: Option<PathBuf>, viewable_rows: Span) -> Self {
+        let entry = Rc::new(RefCell::new(entry));
+        let position = Rc::new(RefCell::new((0, 0)));
+
         Self {
             text_buffer,
-            position: Rc::new(RefCell::new((0, 0))),
+            entry,
+            position,
             viewable_rows,
         }
     }
 
     pub fn try_from_path(path: PathBuf, viewable_rows: Span) -> Result<Self> {
-        let data = fs::read_to_string(path)?;
+        let data = fs::read_to_string(path.clone())?;
         let text_buffer = Self::text_buffer_from_str(&data);
 
-        Ok(Self::new(text_buffer, viewable_rows))
+        Ok(Self::new(text_buffer, Some(path), viewable_rows))
     }
 
     fn text_buffer_from_str(data: &str) -> Vec<String> {
@@ -40,6 +48,10 @@ impl FrameBuffer {
                 _ => line.to_owned(),
             })
             .collect()
+    }
+
+    pub fn save(&self, path: PathBuf) -> Result<()> {
+        fs::write(path, self.format()).map_err(Error::from)
     }
 
     pub fn get(&self, row: Row) -> Option<&String> {
@@ -224,34 +236,38 @@ impl FrameBuffer {
             .collect()
     }
 
-    fn format_span(&self, span: &Span) -> Vec<String> {
-        (span.start..=span.end)
-            .map(|i| match self.get(Row::Index(i)) {
-                Some(line) => format!("{line}{}", util::newline()),
-                None => util::newline().to_owned(),
-            })
-            .collect()
+    fn format(&self) -> String {
+        let span = Span {
+            start: 0,
+            end: self.len(),
+        };
+
+        self.format_span(&span).collect()
+    }
+
+    fn format_span(&self, span: &Span) -> impl Iterator<Item = String> + '_ {
+        (span.start..=span.end).map(|i| match self.get(Row::Index(i)) {
+            Some(line) => format!("{line}{}", util::newline()),
+            None => util::newline().to_owned(),
+        })
     }
 }
 
 impl Display for FrameBuffer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let span = Span {
-            start: 0,
-            end: self.len(),
-        };
-        let data = self.format_span(&span).join(util::newline());
         let message = format!(
             "FrameBuffer: {{
+  entry: {:#?},
   position:  ({}, {}),
   view_span: ({}, {}),
 {}
 }}",
+            self.entry.borrow(),
             self.position.borrow().0,
             self.position.borrow().1,
             self.viewable_rows.start,
             self.viewable_rows.end,
-            data,
+            self.format(),
         );
 
         write!(f, "{message}")
@@ -260,7 +276,7 @@ impl Display for FrameBuffer {
 
 #[test]
 fn works() {
-    let mut buffer = FrameBuffer::new(vec![], Span { start: 0, end: 5 });
+    let mut buffer = FrameBuffer::new(vec![], None, Span { start: 0, end: 5 });
     buffer.append("hello world");
     buffer.insert(3, "xiu");
     buffer.insert(3, "my name is");
