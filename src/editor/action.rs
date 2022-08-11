@@ -195,8 +195,11 @@ impl Editor {
     }
 
     fn delete_current(&mut self) -> Result<()> {
-        self.terminal.write(' ')?;
+        let current_position = *self.buffer.position.borrow();
+        self.buffer.line_remove(current_position);
+        // self.terminal.write(' ')?;
 
-        self.move_left()
+        self.terminal.write(' ')
+        // self.move_left()
     }
 }

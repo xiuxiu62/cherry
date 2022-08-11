@@ -148,30 +148,24 @@ impl FrameBuffer {
         }
     }
 
-    // pub fn line_insert_str(&mut self, row: usize, column: usize, segment: &str) {
-    //     match self.get_mut(Row::Index(row)) {
-    //         Some(line) => {
-    //             let len = line.len();
-    //             if column < len {
-    //                 line.insert_str(column, segment);
-    //                 return;
-    //             }
+    pub fn line_insert_str(&mut self, (column, row): (usize, usize), segment: &str) {
+        match self.get_mut(Row::Index(row)) {
+            Some(line) => {
+                let line_len = line.len();
+                if column <= line_len {
+                    line.insert_str(column, segment);
+                    return;
+                }
 
-    //             let indent: String = (len..column).map(|_| ' ').collect();
-    //             line.push_str(&indent);
-    //             line.push_str(segment);
-    //         }
-    //         None => {
-    //             let indent: String = (0..=column)
-    //                 .into_iter()
-    //                 .filter(|i| *i > 0)
-    //                 .map(|_| ' ')
-    //                 .collect();
-
-    //             self.insert(row, &format!("{indent}{segment}"));
-    //         }
-    //     }
-    // }
+                let indent: String = iter::repeat(' ').take(column - line_len).collect();
+                line.push_str(&format!("{indent}{segment}"));
+            }
+            None => {
+                let indent: String = iter::repeat(' ').take(column).collect();
+                self.insert(row, &format!("{indent}{segment}"));
+            }
+        }
+    }
 
     pub fn line_append(&mut self, row: usize, character: char) {
         match self.get_mut(Row::Index(row)) {
@@ -187,8 +181,8 @@ impl FrameBuffer {
         }
     }
 
-    pub fn line_remove(&mut self, row: usize, column: usize) -> Option<char> {
-        if self.line_len(row) < column {
+    pub fn line_remove(&mut self, (column, row): (usize, usize)) -> Option<char> {
+        if column < self.line_len(row) {
             return self
                 .get_mut(Row::Index(row))
                 .map(|line| line.remove(column));
