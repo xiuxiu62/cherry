@@ -15,7 +15,7 @@ pub enum Message {
 #[derive(Debug)]
 pub struct HistoryNode {
     action: Action,
-    position: (u16, u16),
+    position: (usize, usize),
 }
 
 impl Display for HistoryNode {
@@ -35,7 +35,7 @@ pub enum Action {
     MoveRight,
     MoveUp,
     MoveDown,
-    MoveTo(u16, u16),
+    MoveTo(usize, usize),
     Write(KeyCode),
     Newline,
     Tab,
@@ -69,7 +69,6 @@ impl Display for Action {
     }
 }
 
-// TODO: spin all conversions into base methods and refactor position data to be uniform
 impl Action {
     pub fn execute(self, editor: &mut Editor) -> Result<Message> {
         match self {
@@ -78,7 +77,7 @@ impl Action {
             Action::MoveRight => editor.move_right()?,
             Action::MoveUp => editor.move_up()?,
             Action::MoveDown => editor.move_down()?,
-            Action::MoveTo(column, row) => editor.move_to(column, row)?,
+            Action::MoveTo(column, row) => editor.move_to((column, row))?,
             Action::Write(code) => editor.write_char(code)?,
             Action::Newline => editor.newline()?,
             Action::Tab => editor.tab()?,
@@ -102,10 +101,10 @@ impl Editor {
         self.mode.replace(mode);
     }
 
-    fn move_to(&mut self, column: u16, row: u16) -> Result<()> {
+    fn move_to(&mut self, (column, row): (usize, usize)) -> Result<()> {
         self.buffer.position.replace((column, row));
 
-        self.terminal.cursor_move_to(column + GUTTER_WIDTH, row)
+        self.terminal.cursor_move_to((column + GUTTER_WIDTH, row))
     }
 
     fn move_left(&mut self) -> Result<()> {
@@ -121,14 +120,14 @@ impl Editor {
 
         let row = self.buffer.position.borrow().1;
         match self.buffer.get(Row::Previous) {
-            Some(line) => self.move_to(line.len() as u16, row - 1),
-            None => self.move_to(0, row - 1),
+            Some(line) => self.move_to((line.len(), row - 1)),
+            None => self.move_to((0, row - 1)),
         }
     }
 
     fn move_right(&mut self) -> Result<()> {
         if let Some(line) = self.buffer.get(Row::Current) {
-            if self.buffer.position.borrow().0 < line.len() as u16 {
+            if self.buffer.position.borrow().0 < line.len() {
                 self.buffer.position.borrow_mut().0 += 1;
                 self.terminal.cursor_move(Move::Right(1))?;
 
@@ -137,7 +136,7 @@ impl Editor {
         }
 
         let row = self.buffer.position.borrow().1;
-        self.move_to(0, row + 1)
+        self.move_to((0, row + 1))
     }
 
     fn move_up(&mut self) -> Result<()> {
@@ -147,28 +146,27 @@ impl Editor {
 
         let row = self.buffer.position.borrow().1 - 1;
         let column = match self.buffer.get(Row::Next) {
-            Some(line) => line.len() as u16,
+            Some(line) => line.len(),
             None => 0,
         };
 
-        self.move_to(column, row)
+        self.move_to((column, row))
     }
 
     fn move_down(&mut self) -> Result<()> {
         let row = self.buffer.position.borrow().1 + 1;
         let column = match self.buffer.get(Row::Next) {
-            Some(line) => line.len() as u16,
+            Some(line) => line.len(),
             None => 0,
         };
 
-        self.move_to(column, row)
+        self.move_to((column, row))
     }
 
     fn write_char(&mut self, keycode: KeyCode) -> Result<()> {
         if let Some(value) = CHAR_MAP.get(&keycode) {
-            let (row, column) = *self.buffer.position.borrow();
-            self.buffer
-                .line_insert(row as usize, column as usize, *value);
+            let position = *self.buffer.position.borrow();
+            self.buffer.line_insert(position, *value);
 
             self.terminal.write(value)?;
             self.buffer.position.borrow_mut().0 += 1;
@@ -181,7 +179,7 @@ impl Editor {
         let next_row = self.buffer.position.borrow().1 + 1;
         self.buffer.insert(next_row as usize, "");
 
-        self.move_to(0, next_row)
+        self.move_to((0, next_row))
     }
 
     fn tab(&mut self) -> Result<()> {

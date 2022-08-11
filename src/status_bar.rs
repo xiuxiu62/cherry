@@ -6,7 +6,7 @@ pub struct StatusBar {
     terminal_size: Rc<RefCell<(u16, u16)>>,
     mode: Rc<RefCell<Mode>>,
     entry: Rc<RefCell<Option<PathBuf>>>,
-    position: Rc<RefCell<(u16, u16)>>,
+    position: Rc<RefCell<(usize, usize)>>,
 }
 
 impl StatusBar {
@@ -14,7 +14,7 @@ impl StatusBar {
         terminal_size: Rc<RefCell<(u16, u16)>>,
         mode: Rc<RefCell<Mode>>,
         entry: Rc<RefCell<Option<PathBuf>>>,
-        position: Rc<RefCell<(u16, u16)>>,
+        position: Rc<RefCell<(usize, usize)>>,
     ) -> Self {
         Self {
             terminal_size,

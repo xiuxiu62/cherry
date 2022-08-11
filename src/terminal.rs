@@ -30,11 +30,11 @@ impl Terminal {
         Ok(terminal)
     }
 
-    pub fn initialize(&mut self, start_x: u16, start_y: u16) -> Result<()> {
+    pub fn initialize(&mut self, start_position: (usize, usize)) -> Result<()> {
         self.enable_raw_mode()?;
         self.initialize_terminal()?;
         self.initialize_theme()?;
-        self.cursor_move_to(start_x, start_y)?;
+        self.cursor_move_to(start_position)?;
 
         Ok(())
     }
@@ -88,8 +88,8 @@ impl Terminal {
     }
 
     #[inline]
-    pub fn cursor_move_to(&mut self, column: u16, row: u16) -> Result<()> {
-        Cursor::move_to(self, column, row)
+    pub fn cursor_move_to(&mut self, (column, row): (usize, usize)) -> Result<()> {
+        Cursor::move_to(self, column as u16, row as u16)
     }
 
     #[inline]

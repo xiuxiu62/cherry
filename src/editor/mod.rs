@@ -79,12 +79,12 @@ impl Editor {
 
     // TODO: update start position once frame splitting is implemented
     pub fn initialize(&mut self) -> Result<()> {
-        self.terminal.initialize(0, 0)?;
+        self.terminal.initialize((0, 0))?;
 
         let data = self.buffer.format_viewable();
         self.terminal.write(data)?;
         self.draw_status_bar()?;
-        self.terminal.cursor_move_to(GUTTER_WIDTH, 0)?;
+        self.terminal.cursor_move_to((GUTTER_WIDTH, 0))?;
 
         Ok(())
     }
@@ -148,8 +148,10 @@ impl Editor {
 
     fn handle_mouse_event(&mut self, event: MouseEvent) -> Result<Message> {
         if let MouseEventKind::Down(MouseButton::Left) = event.kind {
-            self.buffer.position.replace((event.row, event.row));
-            Action::MoveTo(event.column, event.row).execute(self)?;
+            self.buffer
+                .position
+                .replace((event.row as usize, event.row as usize));
+            Action::MoveTo(event.column as usize, event.row as usize).execute(self)?;
         };
 
         Ok(Message::Continue)
@@ -171,10 +173,10 @@ impl Editor {
         let previous_position = self.buffer.position.borrow();
         let size = self.terminal.size.borrow().1;
 
-        self.terminal.cursor_move_to(0, size - 1)?;
+        self.terminal.cursor_move_to((0, size as usize - 1))?;
         self.terminal.write(&rendered_bar)?;
         self.terminal
-            .cursor_move_to(previous_position.0 + GUTTER_WIDTH, previous_position.1)?;
+            .cursor_move_to((previous_position.0 + GUTTER_WIDTH, previous_position.1))?;
 
         Ok(())
     }

@@ -42,8 +42,13 @@ fn main() -> Result<()> {
     editor.initialize()?;
     editor.run()?;
 
+    let buffer = editor.buffer.clone();
+
     editor.buffer.save(PathBuf::from("log/file.log"))?;
     fs::write("log/history.log", editor.format_history())?;
+    drop(editor);
+
+    println!("{:#?}", buffer);
 
     Ok(())
 }

@@ -2,9 +2,9 @@ use crate::{
     error::{Error, Result},
     util, Span,
 };
-use std::{cell::RefCell, fmt::Display, fs, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, fmt::Display, fs, iter, path::PathBuf, rc::Rc};
 
-pub const GUTTER_WIDTH: u16 = 5;
+pub const GUTTER_WIDTH: usize = 5;
 
 pub enum Row {
     Previous,
@@ -13,11 +13,11 @@ pub enum Row {
     Index(usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FrameBuffer {
     text_buffer: Vec<String>,
     pub entry: Rc<RefCell<Option<PathBuf>>>, // Directory entry being edited
-    pub position: Rc<RefCell<(/*column*/ u16, /*row*/ u16)>>,
+    pub position: Rc<RefCell<(/*column*/ usize, /*row*/ usize)>>,
     pub viewable_rows: Span,
 }
 
@@ -56,23 +56,19 @@ impl FrameBuffer {
 
     pub fn get(&self, row: Row) -> Option<&String> {
         match row {
-            Row::Previous => self.text_buffer.get(self.position.borrow().1 as usize - 1),
-            Row::Current => self.text_buffer.get(self.position.borrow().1 as usize),
-            Row::Next => self.text_buffer.get(self.position.borrow().1 as usize + 1),
-            Row::Index(i) => self.text_buffer.get(i as usize),
+            Row::Previous => self.text_buffer.get(self.position.borrow().1 - 1),
+            Row::Current => self.text_buffer.get(self.position.borrow().1),
+            Row::Next => self.text_buffer.get(self.position.borrow().1 + 1),
+            Row::Index(i) => self.text_buffer.get(i),
         }
     }
 
     pub fn get_mut(&mut self, row: Row) -> Option<&mut String> {
         match row {
-            Row::Previous => self
-                .text_buffer
-                .get_mut(self.position.borrow().1 as usize - 1),
-            Row::Current => self.text_buffer.get_mut(self.position.borrow().1 as usize),
-            Row::Next => self
-                .text_buffer
-                .get_mut(self.position.borrow().1 as usize + 1),
-            Row::Index(i) => self.text_buffer.get_mut(i as usize),
+            Row::Previous => self.text_buffer.get_mut(self.position.borrow().1 - 1),
+            Row::Current => self.text_buffer.get_mut(self.position.borrow().1),
+            Row::Next => self.text_buffer.get_mut(self.position.borrow().1 + 1),
+            Row::Index(i) => self.text_buffer.get_mut(i),
         }
     }
 
@@ -133,8 +129,7 @@ impl FrameBuffer {
         vec![]
     }
 
-    // Likely culprit of the buffer write bug
-    pub fn line_insert(&mut self, row: usize, column: usize, character: char) {
+    pub fn line_insert(&mut self, (column, row): (usize, usize), character: char) {
         let line_len = self.line_len(row);
         match self.get_mut(Row::Index(row)) {
             Some(line) => {
@@ -143,40 +138,40 @@ impl FrameBuffer {
                     return;
                 }
 
-                let indent: String = (line_len..column).map(|_| ' ').collect();
+                let indent: String = iter::repeat(' ').take(column - line_len).collect();
                 line.push_str(&format!("{indent}{character}"));
             }
             None => {
-                let indent: String = (0..column).into_iter().map(|_| ' ').collect();
+                let indent: String = iter::repeat(' ').take(column).collect();
                 self.insert(row, &format!("{indent}{character}"));
             }
         }
     }
 
-    pub fn line_insert_str(&mut self, row: usize, column: usize, segment: &str) {
-        match self.get_mut(Row::Index(row)) {
-            Some(line) => {
-                let len = line.len();
-                if column < len {
-                    line.insert_str(column, segment);
-                    return;
-                }
+    // pub fn line_insert_str(&mut self, row: usize, column: usize, segment: &str) {
+    //     match self.get_mut(Row::Index(row)) {
+    //         Some(line) => {
+    //             let len = line.len();
+    //             if column < len {
+    //                 line.insert_str(column, segment);
+    //                 return;
+    //             }
 
-                let indent: String = (len..column).map(|_| ' ').collect();
-                line.push_str(&indent);
-                line.push_str(segment);
-            }
-            None => {
-                let indent: String = (0..=column)
-                    .into_iter()
-                    .filter(|i| *i > 0)
-                    .map(|_| ' ')
-                    .collect();
+    //             let indent: String = (len..column).map(|_| ' ').collect();
+    //             line.push_str(&indent);
+    //             line.push_str(segment);
+    //         }
+    //         None => {
+    //             let indent: String = (0..=column)
+    //                 .into_iter()
+    //                 .filter(|i| *i > 0)
+    //                 .map(|_| ' ')
+    //                 .collect();
 
-                self.insert(row, &format!("{indent}{segment}"));
-            }
-        }
-    }
+    //             self.insert(row, &format!("{indent}{segment}"));
+    //         }
+    //     }
+    // }
 
     pub fn line_append(&mut self, row: usize, character: char) {
         match self.get_mut(Row::Index(row)) {
