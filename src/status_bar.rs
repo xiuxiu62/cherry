@@ -1,5 +1,5 @@
 use crate::editor::Mode;
-use std::{cell::RefCell, fmt::Display, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, fmt::Display, iter, path::PathBuf, rc::Rc};
 
 #[derive(Debug)]
 pub struct StatusBar {
@@ -32,21 +32,20 @@ impl Display for StatusBar {
             Mode::Normal => "Normal",
             Mode::Visual => "Visual",
         };
-        let position = format!("{}:{}", self.position.borrow().0, self.position.borrow().1);
         let entry = match self.entry.borrow().as_ref() {
             Some(entry) => format!("{}", entry.display()),
             None => "[scratch]".to_owned(),
         };
+        let position = format!("{}:{}", self.position.borrow().0, self.position.borrow().1);
+        let center_indent: String = {
+            let lhs_length = 1 + mode.len() + 4 + entry.len();
+            let width = self.terminal_size.borrow().0 as usize;
 
-        let mut message = String::new();
-        message.push(' ');
-        message.push_str(mode);
-        message.push_str("    ");
-        message.push_str(&entry);
-        (message.len() + 1..self.terminal_size.borrow().1 as usize - position.len())
-            .for_each(|_| message.push(' '));
-        message.push_str(&position);
+            iter::repeat(' ')
+                .take(width - lhs_length - position.len() - 1)
+                .collect()
+        };
 
-        write!(f, "{message}")
+        write!(f, " {mode}    {entry}{center_indent}{position} ")
     }
 }

@@ -109,10 +109,25 @@ impl Editor {
     fn handle_key_event(&mut self, event: KeyEvent) -> Result<Message> {
         let mode = *self.mode.borrow();
         match mode {
-            Mode::Insert => self.handle_insert_mode_key_event(event),
             Mode::Normal => self.handle_normal_mode_key_event(event),
+            Mode::Insert => self.handle_insert_mode_key_event(event),
             Mode::Visual => Ok(Message::Continue),
         }
+    }
+
+    #[inline]
+    fn handle_normal_mode_key_event(&mut self, event: KeyEvent) -> Result<Message> {
+        match (event.code, event.modifiers) {
+            (KeyCode::Char('i'), KeyModifiers::NONE) => Action::ChangeMode(Mode::Insert),
+            (KeyCode::Char('c'), KeyModifiers::CONTROL) => Action::Exit,
+            (KeyCode::Left | KeyCode::Char('h'), KeyModifiers::NONE) => Action::MoveLeft,
+            (KeyCode::Right | KeyCode::Char('l'), KeyModifiers::NONE) => Action::MoveRight,
+            (KeyCode::Up | KeyCode::Char('k'), KeyModifiers::NONE) => Action::MoveUp,
+            (KeyCode::Down | KeyCode::Char('j'), KeyModifiers::NONE) => Action::MoveDown,
+            (KeyCode::Char('d'), KeyModifiers::NONE) => Action::DeleteCurrent,
+            _ => Action::None,
+        }
+        .execute(self)
     }
 
     #[inline]
@@ -127,20 +142,6 @@ impl Editor {
             (KeyCode::Enter, KeyModifiers::NONE) => Action::Newline,
             (KeyCode::Tab, KeyModifiers::NONE) => Action::Tab,
             (code, KeyModifiers::NONE | KeyModifiers::SHIFT) => Action::Write(code),
-            _ => Action::None,
-        }
-        .execute(self)
-    }
-
-    #[inline]
-    fn handle_normal_mode_key_event(&mut self, event: KeyEvent) -> Result<Message> {
-        match (event.code, event.modifiers) {
-            (KeyCode::Char('i'), KeyModifiers::NONE) => Action::ChangeMode(Mode::Insert),
-            (KeyCode::Char('c'), KeyModifiers::CONTROL) => Action::Exit,
-            (KeyCode::Left | KeyCode::Char('h'), KeyModifiers::NONE) => Action::MoveLeft,
-            (KeyCode::Right | KeyCode::Char('l'), KeyModifiers::NONE) => Action::MoveRight,
-            (KeyCode::Up | KeyCode::Char('k'), KeyModifiers::NONE) => Action::MoveUp,
-            (KeyCode::Down | KeyCode::Char('j'), KeyModifiers::NONE) => Action::MoveDown,
             _ => Action::None,
         }
         .execute(self)
