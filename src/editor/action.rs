@@ -1,8 +1,8 @@
 use crate::{
     editor::{Mode, Move},
     error::Result,
-    frame_buffer::{Row, GUTTER_WIDTH},
-    Editor, CHAR_MAP,
+    frame_buffer::{Line, GUTTER_WIDTH},
+    Editor, Span, CHAR_MAP,
 };
 use crossterm::event::KeyCode;
 use std::fmt::Display;
@@ -119,14 +119,14 @@ impl Editor {
         }
 
         let row = self.buffer.position.borrow().1;
-        match self.buffer.get(Row::Previous) {
+        match self.buffer.get(Line::Previous) {
             Some(line) => self.move_to((line.len(), row - 1)),
             None => self.move_to((0, row - 1)),
         }
     }
 
     fn move_right(&mut self) -> Result<()> {
-        if let Some(line) = self.buffer.get(Row::Current) {
+        if let Some(line) = self.buffer.get(Line::Current) {
             if self.buffer.position.borrow().0 < line.len() {
                 self.buffer.position.borrow_mut().0 += 1;
                 self.terminal.cursor_move(Move::Right(1))?;
@@ -145,7 +145,7 @@ impl Editor {
         }
 
         let row = self.buffer.position.borrow().1 - 1;
-        let column = match self.buffer.get(Row::Next) {
+        let column = match self.buffer.get(Line::Next) {
             Some(line) => line.len(),
             None => 0,
         };
@@ -155,7 +155,7 @@ impl Editor {
 
     fn move_down(&mut self) -> Result<()> {
         let row = self.buffer.position.borrow().1 + 1;
-        let column = match self.buffer.get(Row::Next) {
+        let column = match self.buffer.get(Line::Next) {
             Some(line) => line.len(),
             None => 0,
         };
@@ -165,10 +165,12 @@ impl Editor {
 
     fn write_char(&mut self, keycode: KeyCode) -> Result<()> {
         if let Some(value) = CHAR_MAP.get(&keycode) {
-            let position = *self.buffer.position.borrow();
-            self.buffer.line_insert(position, *value);
+            let column = self.buffer.position.borrow().0;
+            self.buffer.line_insert(Line::Current, column, *value);
 
-            self.terminal.write(value)?;
+            // SAFETY: if the line did not exist before, we've just created it
+            let current_line = self.buffer.get(Line::Current).unwrap();
+            self.terminal.write(&current_line[column..])?;
             self.buffer.position.borrow_mut().0 += 1;
         };
 
@@ -176,10 +178,62 @@ impl Editor {
     }
 
     fn newline(&mut self) -> Result<()> {
-        let next_row = self.buffer.position.borrow().1 + 1;
-        self.buffer.insert(next_row as usize, "");
+        let (column, row) = *self.buffer.position.borrow();
 
-        self.move_to((0, next_row))
+        // If there is text after our cursor move rest to next line and
+        // re-render current and next line,
+        // moving cursor to the start of the next line
+        // SAFETY: we ensure that there is data present prior to each unwrap
+        if let Some(data) = self.buffer.get(Line::Current) {
+            let line_len = data.len();
+            if column < line_len {
+                // remove remainder of the line
+                let line_slice = self
+                    .buffer
+                    .line_remove_span(
+                        Line::Current,
+                        Span {
+                            start: column,
+                            end: line_len,
+                        },
+                    )
+                    .unwrap();
+
+                self.buffer.insert(Line::Next, &line_slice);
+                let next_row = self.buffer.position.borrow().1 + 1;
+                self.buffer.position.replace((0, next_row));
+
+                return self.rerender();
+
+                // return self.rerender();
+                // TODO: fix re-render
+                // self.terminal.cursor_hide()?;
+                // // place remained on the next line
+                // self.buffer.insert(Line::Next, &line_slice);
+
+                // // re-render current line
+                // self.terminal
+                //     .cursor_move(Move::To(GUTTER_WIDTH as u16, row as u16))?;
+                // self.terminal.clear_current_line()?;
+                // self.terminal
+                //     .write(self.buffer.get(Line::Current).unwrap())?;
+
+                // // re-render next line
+                // self.terminal
+                //     .cursor_move(Move::To(GUTTER_WIDTH as u16, row as u16 + 1))?;
+                // self.terminal.clear_current_line()?;
+                // self.terminal.write(self.buffer.get(Line::Next).unwrap())?;
+                // self.terminal.cursor_show()?;
+
+                // // place cursor at beginning of next line
+                // return self.move_to((0, row + 1));
+            }
+        };
+
+        self.buffer.insert(Line::Next, "");
+        self.move_to((0, row + 1))?;
+
+        self.rerender()
     }
 
     fn tab(&mut self) -> Result<()> {
@@ -195,11 +249,21 @@ impl Editor {
     }
 
     fn delete_current(&mut self) -> Result<()> {
-        let current_position = *self.buffer.position.borrow();
-        self.buffer.line_remove(current_position);
-        // self.terminal.write(' ')?;
+        let column = self.buffer.position.borrow().0;
+        self.buffer.line_remove(Line::Current, column);
 
         self.terminal.write(' ')
-        // self.move_left()
+    }
+
+    fn rerender(&mut self) -> Result<()> {
+        let current_position = *self.buffer.position.borrow();
+        let viewable = self.buffer.format_viewable();
+        self.terminal.cursor_hide()?;
+        self.terminal.clear()?;
+        self.terminal.cursor_reset()?;
+        self.terminal.write(viewable)?;
+        self.move_to(current_position)?;
+
+        self.terminal.cursor_show()
     }
 }

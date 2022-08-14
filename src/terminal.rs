@@ -82,6 +82,10 @@ impl Terminal {
         self.execute(terminal::Clear(ClearType::All))
     }
 
+    pub fn clear_current_line(&mut self) -> Result<()> {
+        self.execute(terminal::Clear(ClearType::CurrentLine))
+    }
+
     #[inline]
     pub fn cursor_move(&mut self, move_: Move) -> Result<()> {
         Cursor::move_(self, move_)
@@ -90,6 +94,21 @@ impl Terminal {
     #[inline]
     pub fn cursor_move_to(&mut self, (column, row): (usize, usize)) -> Result<()> {
         Cursor::move_to(self, column as u16, row as u16)
+    }
+
+    #[inline]
+    pub fn cursor_reset(&mut self) -> Result<()> {
+        Cursor::reset(self)
+    }
+
+    #[inline]
+    pub fn cursor_show(&mut self) -> Result<()> {
+        Cursor::show(self)
+    }
+
+    #[inline]
+    pub fn cursor_hide(&mut self) -> Result<()> {
+        Cursor::hide(self)
     }
 
     #[inline]

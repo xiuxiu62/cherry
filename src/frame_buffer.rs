@@ -6,7 +6,8 @@ use std::{cell::RefCell, fmt::Display, fs, iter, path::PathBuf, rc::Rc};
 
 pub const GUTTER_WIDTH: usize = 5;
 
-pub enum Row {
+#[derive(Debug, Clone, Copy)]
+pub enum Line {
     Previous,
     Current,
     Next,
@@ -54,21 +55,30 @@ impl FrameBuffer {
         fs::write(path, self.format()).map_err(Error::from)
     }
 
-    pub fn get(&self, row: Row) -> Option<&String> {
-        match row {
-            Row::Previous => self.text_buffer.get(self.position.borrow().1 - 1),
-            Row::Current => self.text_buffer.get(self.position.borrow().1),
-            Row::Next => self.text_buffer.get(self.position.borrow().1 + 1),
-            Row::Index(i) => self.text_buffer.get(i),
+    pub fn get(&self, line: Line) -> Option<&String> {
+        match line {
+            Line::Previous => self.text_buffer.get(self.position.borrow().1 - 1),
+            Line::Current => self.text_buffer.get(self.position.borrow().1),
+            Line::Next => self.text_buffer.get(self.position.borrow().1 + 1),
+            Line::Index(i) => self.text_buffer.get(i),
         }
     }
 
-    pub fn get_mut(&mut self, row: Row) -> Option<&mut String> {
-        match row {
-            Row::Previous => self.text_buffer.get_mut(self.position.borrow().1 - 1),
-            Row::Current => self.text_buffer.get_mut(self.position.borrow().1),
-            Row::Next => self.text_buffer.get_mut(self.position.borrow().1 + 1),
-            Row::Index(i) => self.text_buffer.get_mut(i),
+    pub fn get_mut(&mut self, line: Line) -> Option<&mut String> {
+        match line {
+            Line::Previous => self.text_buffer.get_mut(self.position.borrow().1 - 1),
+            Line::Current => self.text_buffer.get_mut(self.position.borrow().1),
+            Line::Next => self.text_buffer.get_mut(self.position.borrow().1 + 1),
+            Line::Index(i) => self.text_buffer.get_mut(i),
+        }
+    }
+
+    pub fn get_row(&self, line: Line) -> usize {
+        match line {
+            Line::Current => self.position.borrow().1,
+            Line::Next => self.position.borrow().1 + 1,
+            Line::Previous => self.position.borrow().1 - 1,
+            Line::Index(i) => i,
         }
     }
 
@@ -76,8 +86,8 @@ impl FrameBuffer {
         self.text_buffer.len()
     }
 
-    pub fn line_len(&self, row: usize) -> usize {
-        match self.get(Row::Index(row)) {
+    pub fn line_len(&self, line: Line) -> usize {
+        match self.get(line) {
             Some(line) => line.len(),
             None => 0,
         }
@@ -87,15 +97,16 @@ impl FrameBuffer {
         self.text_buffer.is_empty()
     }
 
-    pub fn line_is_empty(&self, row: usize) -> bool {
-        match self.get(Row::Index(row)) {
+    pub fn line_is_empty(&self, line: Line) -> bool {
+        match self.get(line) {
             Some(line) => line.is_empty(),
             None => true,
         }
     }
 
-    pub fn insert(&mut self, row: usize, data: &str) {
+    pub fn insert(&mut self, line: Line, data: &str) {
         let buffer_len = self.len();
+        let row = self.get_row(line);
         if row < buffer_len {
             self.text_buffer.insert(row, data.to_owned());
 
@@ -109,11 +120,12 @@ impl FrameBuffer {
         self.text_buffer.push(data.to_owned());
     }
 
-    pub fn append(&mut self, line: &str) {
-        self.text_buffer.push(line.to_owned());
+    pub fn append(&mut self, data: &str) {
+        self.text_buffer.push(data.to_owned());
     }
 
-    pub fn remove(&mut self, row: usize) -> Option<String> {
+    pub fn remove(&mut self, line: Line) -> Option<String> {
+        let row = self.get_row(line);
         if row < self.len() {
             return Some(self.text_buffer.remove(row));
         }
@@ -129,81 +141,79 @@ impl FrameBuffer {
         vec![]
     }
 
-    pub fn line_insert(&mut self, (column, row): (usize, usize), character: char) {
-        let line_len = self.line_len(row);
-        match self.get_mut(Row::Index(row)) {
-            Some(line) => {
+    pub fn line_insert(&mut self, line: Line, column: usize, character: char) {
+        match self.get_mut(line) {
+            Some(data) => {
+                let line_len = data.len();
                 if column <= line_len {
-                    line.insert(column, character);
+                    data.insert(column, character);
                     return;
                 }
 
                 let indent: String = iter::repeat(' ').take(column - line_len).collect();
-                line.push_str(&format!("{indent}{character}"));
+                data.push_str(&format!("{indent}{character}"));
             }
             None => {
                 let indent: String = iter::repeat(' ').take(column).collect();
-                self.insert(row, &format!("{indent}{character}"));
+                self.insert(line, &format!("{indent}{character}"));
             }
         }
     }
 
-    pub fn line_insert_str(&mut self, (column, row): (usize, usize), segment: &str) {
-        match self.get_mut(Row::Index(row)) {
-            Some(line) => {
-                let line_len = line.len();
+    pub fn line_insert_str(&mut self, line: Line, column: usize, segment: &str) {
+        match self.get_mut(line) {
+            Some(data) => {
+                let line_len = data.len();
                 if column <= line_len {
-                    line.insert_str(column, segment);
+                    data.insert_str(column, segment);
                     return;
                 }
 
                 let indent: String = iter::repeat(' ').take(column - line_len).collect();
-                line.push_str(&format!("{indent}{segment}"));
+                data.push_str(&format!("{indent}{segment}"));
             }
             None => {
                 let indent: String = iter::repeat(' ').take(column).collect();
-                self.insert(row, &format!("{indent}{segment}"));
+                self.insert(line, &format!("{indent}{segment}"));
             }
         }
     }
 
-    pub fn line_append(&mut self, row: usize, character: char) {
-        match self.get_mut(Row::Index(row)) {
-            Some(line) => line.push(character),
-            None => self.insert(row, character.to_string().as_str()),
+    pub fn line_append(&mut self, line: Line, character: char) {
+        match self.get_mut(line) {
+            Some(data) => data.push(character),
+            None => self.insert(line, character.to_string().as_str()),
         }
     }
 
-    pub fn line_append_str(&mut self, row: usize, segment: &str) {
-        match self.get_mut(Row::Index(row)) {
-            Some(line) => line.push_str(segment),
-            None => self.insert(row, segment),
+    pub fn line_append_str(&mut self, line: Line, segment: &str) {
+        match self.get_mut(line) {
+            Some(data) => data.push_str(segment),
+            None => self.insert(line, segment),
         }
     }
 
-    pub fn line_remove(&mut self, (column, row): (usize, usize)) -> Option<char> {
-        if column < self.line_len(row) {
-            return self
-                .get_mut(Row::Index(row))
-                .map(|line| line.remove(column));
+    pub fn line_remove(&mut self, line: Line, column: usize) -> Option<char> {
+        if column < self.line_len(line) {
+            return self.get_mut(line).map(|data| data.remove(column));
         }
 
         None
     }
 
-    pub fn line_remove_span(&mut self, row: usize, mut span: Span) -> Option<String> {
-        match self.get_mut(Row::Index(row)) {
-            Some(line) => {
-                let len = line.len();
+    pub fn line_remove_span(&mut self, line: Line, mut span: Span) -> Option<String> {
+        match self.get_mut(line) {
+            Some(data) => {
+                let len = data.len();
                 if len == 0 || span.start >= len {
                     return None;
                 }
 
                 if span.end >= len {
-                    span.end = len - 1;
+                    span.end = len;
                 }
 
-                Some(line.drain(span).collect())
+                Some(data.drain(span).collect())
             }
             None => None,
         }
@@ -235,7 +245,7 @@ impl FrameBuffer {
     }
 
     fn format_span(&self, span: &Span) -> impl Iterator<Item = String> + '_ {
-        (span.start..=span.end).map(|i| match self.get(Row::Index(i)) {
+        (span.start..=span.end).map(|i| match self.get(Line::Index(i)) {
             Some(line) => format!("{line}{}", util::newline()),
             None => util::newline().to_owned(),
         })
@@ -263,26 +273,67 @@ impl Display for FrameBuffer {
     }
 }
 
-#[test]
-fn works() {
-    let mut buffer = FrameBuffer::new(vec![], None, Span { start: 0, end: 5 });
-    buffer.append("hello world");
-    buffer.insert(3, "xiu");
-    buffer.insert(3, "my name is");
-    buffer.insert(6, ":)");
+#[cfg(test)]
+mod test {
+    use super::{FrameBuffer, Line};
+    use crate::{error::Result, Span};
+    use std::path::PathBuf;
 
-    println!("{}{}", buffer.format_viewable(), util::newline());
-    println!("{buffer}");
-}
+    #[test]
+    fn insert() {
+        let mut buffer = FrameBuffer::new(vec![], None, Span { start: 0, end: 5 });
+        buffer.append("hello world");
+        buffer.insert(Line::Index(1), "xiu");
+        buffer.insert(Line::Index(1), "my name is");
+        buffer.insert(Line::Index(3), ":)");
 
-#[test]
-fn from_path() -> Result<()> {
-    let mut buffer =
-        FrameBuffer::try_from_path(PathBuf::from("config.ron"), Span { start: 0, end: 5 })?;
-    buffer.append("hello world");
+        assert_eq!(buffer.text_buffer[0], "hello world");
+        assert_eq!(buffer.text_buffer[1], "my name is");
+        assert_eq!(buffer.text_buffer[2], "xiu");
+        assert_eq!(buffer.text_buffer[3], ":)");
+    }
 
-    println!("{}{}", buffer.format_viewable(), util::newline());
-    println!("{buffer}");
+    #[test]
+    fn from_path() -> Result<()> {
+        let mut buffer =
+            FrameBuffer::try_from_path(PathBuf::from("config.ron"), Span { start: 0, end: 5 })?;
+        buffer.append("hello world");
 
-    Ok(())
+        Ok(())
+    }
+
+    #[test]
+    fn line_remove_span() -> Result<()> {
+        let mut buffer = FrameBuffer::new(
+            vec!["Hello world".to_owned()],
+            None,
+            Span { start: 0, end: 5 },
+        );
+
+        let segment = buffer.line_remove_span(Line::Current, Span { start: 0, end: 5 });
+        assert_eq!(segment, Some("Hello".to_owned()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn line_remove_span_full() -> Result<()> {
+        let mut buffer = FrameBuffer::new(
+            vec!["Hello world".to_owned()],
+            None,
+            Span { start: 0, end: 5 },
+        );
+
+        let line_len = buffer.line_len(Line::Current);
+        let segment = buffer.line_remove_span(
+            Line::Current,
+            Span {
+                start: 0,
+                end: line_len,
+            },
+        );
+        assert_eq!(segment, Some("Hello world".to_owned()));
+
+        Ok(())
+    }
 }
