@@ -111,6 +111,14 @@ impl Terminal {
         Cursor::hide(self)
     }
 
+    pub fn scroll_up(&mut self, n: u16) -> Result<()> {
+        self.execute(terminal::ScrollUp(n))
+    }
+
+    pub fn scroll_down(&mut self, n: u16) -> Result<()> {
+        self.execute(terminal::ScrollDown(n))
+    }
+
     #[inline]
     pub fn size(&self) -> Result<(u16, u16)> {
         Ok(terminal::size()?)

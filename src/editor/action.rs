@@ -36,6 +36,8 @@ pub enum Action {
     MoveUp,
     MoveDown,
     MoveTo(usize, usize),
+    ScrollUp(usize),
+    ScrollDown(usize),
     Write(KeyCode),
     Newline,
     Tab,
@@ -56,6 +58,8 @@ impl Display for Action {
             Self::MoveUp => "Move Up",
             Self::MoveDown => "Move Down",
             Self::MoveTo(column, row) => return write!(f, "Move `({column}, {row})`"),
+            Self::ScrollUp(n) => return write!(f, "Scroll Up {n}"),
+            Self::ScrollDown(n) => return write!(f, "Scroll Down {n}"),
             Self::Write(char) => return write!(f, "Write `{char:?}`"),
             Self::Newline => "Newline",
             Self::Tab => "Tab",
@@ -69,34 +73,32 @@ impl Display for Action {
     }
 }
 
-impl Action {
-    pub fn execute(self, editor: &mut Editor) -> Result<Message> {
-        match self {
-            Action::ChangeMode(mode) => editor.change_mode(mode),
-            Action::MoveLeft => editor.move_left()?,
-            Action::MoveRight => editor.move_right()?,
-            Action::MoveUp => editor.move_up()?,
-            Action::MoveDown => editor.move_down()?,
-            Action::MoveTo(column, row) => editor.move_to((column, row))?,
-            Action::Write(code) => editor.write_char(code)?,
-            Action::Newline => editor.newline()?,
-            Action::Tab => editor.tab()?,
-            Action::DeleteLast => editor.delete_last()?,
-            Action::DeleteCurrent => editor.delete_current()?,
+impl Editor {
+    pub fn execute(&mut self, action: Action) -> Result<Message> {
+        match action {
+            Action::ChangeMode(mode) => self.change_mode(mode),
+            Action::MoveLeft => self.move_left()?,
+            Action::MoveRight => self.move_right()?,
+            Action::MoveUp => self.move_up()?,
+            Action::MoveDown => self.move_down()?,
+            Action::MoveTo(column, row) => self.move_to((column, row))?,
+            Action::ScrollUp(n) => self.scroll_up(n)?,
+            Action::ScrollDown(n) => self.scroll_down(n)?,
+            Action::Write(code) => self.write_char(code)?,
+            Action::Newline => self.newline()?,
+            Action::Tab => self.tab()?,
+            Action::DeleteLast => self.delete_last()?,
+            Action::DeleteCurrent => self.delete_current()?,
             Action::Exit => return Ok(Message::Exit),
             Action::None => return Ok(Message::Continue),
         };
 
-        editor.history.push(HistoryNode {
-            action: self,
-            position: *editor.buffer.position.borrow(),
-        });
+        let position = *self.buffer.position.borrow();
+        self.history.push(HistoryNode { action, position });
 
         Ok(Message::Continue)
     }
-}
 
-impl Editor {
     fn change_mode(&mut self, mode: Mode) {
         self.mode.replace(mode);
     }
@@ -161,6 +163,16 @@ impl Editor {
         };
 
         self.move_to((column, row))
+    }
+
+    // TODO: integrate with buffers
+    fn scroll_up(&mut self, n: usize) -> Result<()> {
+        self.terminal.scroll_down(n as u16)
+    }
+
+    // TODO: integrate with buffers
+    fn scroll_down(&mut self, n: usize) -> Result<()> {
+        self.terminal.scroll_up(n as u16)
     }
 
     fn write_char(&mut self, keycode: KeyCode) -> Result<()> {

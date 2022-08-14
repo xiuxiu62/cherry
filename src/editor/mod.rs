@@ -86,6 +86,15 @@ impl Editor {
         self.draw_status_bar()?;
         self.terminal.cursor_move_to((GUTTER_WIDTH, 0))?;
 
+        self.draw_status_bar()?;
+
+        // TEMP
+        self.execute(Action::Newline)?;
+        self.execute(Action::Write(KeyCode::Char(':')))?;
+        self.execute(Action::Write(KeyCode::Char(')')))?;
+        self.execute(Action::ScrollDown(1))?;
+        // TEMP
+
         Ok(())
     }
 
@@ -117,7 +126,7 @@ impl Editor {
 
     #[inline]
     fn handle_normal_mode_key_event(&mut self, event: KeyEvent) -> Result<Message> {
-        match (event.code, event.modifiers) {
+        let action = match (event.code, event.modifiers) {
             (KeyCode::Char('i'), KeyModifiers::NONE) => Action::ChangeMode(Mode::Insert),
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => Action::Exit,
             (KeyCode::Left | KeyCode::Char('h'), KeyModifiers::NONE) => Action::MoveLeft,
@@ -126,13 +135,14 @@ impl Editor {
             (KeyCode::Down | KeyCode::Char('j'), KeyModifiers::NONE) => Action::MoveDown,
             (KeyCode::Char('d'), KeyModifiers::NONE) => Action::DeleteCurrent,
             _ => Action::None,
-        }
-        .execute(self)
+        };
+
+        self.execute(action)
     }
 
     #[inline]
     fn handle_insert_mode_key_event(&mut self, event: KeyEvent) -> Result<Message> {
-        match (event.code, event.modifiers) {
+        let action = match (event.code, event.modifiers) {
             (KeyCode::Esc, KeyModifiers::NONE) => Action::ChangeMode(Mode::Normal),
             (KeyCode::Left, KeyModifiers::NONE) => Action::MoveLeft,
             (KeyCode::Right, KeyModifiers::NONE) => Action::MoveRight,
@@ -143,8 +153,9 @@ impl Editor {
             (KeyCode::Tab, KeyModifiers::NONE) => Action::Tab,
             (code, KeyModifiers::NONE | KeyModifiers::SHIFT) => Action::Write(code),
             _ => Action::None,
-        }
-        .execute(self)
+        };
+
+        self.execute(action)
     }
 
     fn handle_mouse_event(&mut self, event: MouseEvent) -> Result<Message> {
@@ -152,7 +163,7 @@ impl Editor {
             self.buffer
                 .position
                 .replace((event.row as usize, event.row as usize));
-            Action::MoveTo(event.column as usize, event.row as usize).execute(self)?;
+            self.execute(Action::MoveTo(event.column as usize, event.row as usize))?;
         };
 
         Ok(Message::Continue)

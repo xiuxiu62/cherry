@@ -231,7 +231,7 @@ impl FrameBuffer {
         (view_span.start..=view_span.end)
             .zip(self.format_span(view_span))
             .into_iter()
-            .map(|(i, line)| format!("{} {line}", format_number(i)))
+            .map(|(i, line)| format!("{} {line}", format_number(i + 1)))
             .collect()
     }
 
